@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from background_sync import (
     build_plan, refresh_baseline, run_once, save_private_json, read_json,
-    notify_if_changed, transfer_one,
+    notify_if_changed, transfer_one, read_baseline,
 )
 
 MD5_A = ("md5", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -75,6 +75,31 @@ class SafePlanTests(unittest.TestCase):
         self.assertEqual(
             refresh_baseline({}, {"one.txt": MD5_A}, {"one.txt": MD5_A}),
             {"one.txt": MD5_A[1]})
+
+    def test_corrupt_existing_history_fails_closed(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "existing.json"
+            path.write_text("{corrupted", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "Histórico"):
+                read_baseline(path)
+
+    def test_nonexistent_history_is_first_run(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.assertEqual(read_baseline(Path(root) / "never.json"), {})
+
+    def test_history_symlink_is_rejected(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "snapshot.json"
+            path.symlink_to("/etc/passwd")
+            with self.assertRaisesRegex(ValueError, "inseguro"):
+                read_baseline(path)
+
+    def test_history_invalid_hash_rejected_before_io(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "snapshot.json"
+            path.write_text(json.dumps({"md5": {"document.txt": "INVALID"}}))
+            with self.assertRaisesRegex(ValueError, "hashes inválidos"):
+                read_baseline(path)
 
     def test_private_file_permissions(self):
         with tempfile.TemporaryDirectory() as tmp:
