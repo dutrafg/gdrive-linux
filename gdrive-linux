@@ -540,6 +540,22 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.diagnostics_text.set_selectable(True)
         diagnostic.append(self.diagnostics_text)
         settings_page.append(diagnostic)
+        tray_card = card("Indicador de sincronização no painel",
+            "Ícone opcional próximo ao relógio do Zorin, com estado de sincronização, "
+            "abrir aplicativo e sincronizar agora.", "emblem-synchronizing-symbolic")
+        tray_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        tray_row.append(label("Iniciar indicador ao entrar no Linux",
+                              hexpand=True, wrap=True))
+        self.tray_switch = Gtk.Switch()
+        self.tray_switch.set_valign(Gtk.Align.CENTER)
+        self.tray_switch.set_active(indicator_enabled())
+        self.tray_switch.connect("notify::active", self.tray_changed)
+        tray_row.append(self.tray_switch)
+        tray_card.append(tray_row)
+        self.tray_status = label("Requer suporte Ayatana AppIndicator do desktop.",
+                                 "drive-muted", wrap=True)
+        tray_card.append(self.tray_status)
+        settings_page.append(tray_card)
         privacy = card("Privacidade e proteção",
             "O aplicativo não solicita sua senha Google e não armazena tokens nas preferências.",
             "security-high-symbolic")
@@ -677,6 +693,23 @@ class DriveWindow(Gtk.ApplicationWindow):
             "drive-muted", wrap=True))
         page.append(limits)
         self.pages.add_titled(page, "photos", "Google Fotos")
+
+    def tray_changed(self, switch, *_):
+        wanted = switch.get_active()
+        try:
+            set_indicator_autostart(wanted)
+            if wanted:
+                subprocess.Popen(
+                    ["/usr/bin/python3", "/usr/share/gdrive-linux/tray_indicator.py"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    start_new_session=True)
+            self.tray_status.set_text(
+                "Indicador configurado para aparecer ao entrar no Linux."
+                if wanted else
+                "Indicador desativado nas próximas sessões. "
+                "O ícone atual poderá ser fechado pelo menu.")
+        except (OSError, ValueError) as exc:
+            self.tray_status.set_text("Falha ao configurar indicador: " + str(exc))
 
     def run_diagnostics(self, *_):
         self.diagnostics_text.set_text("Executando verificações do Linux…")
