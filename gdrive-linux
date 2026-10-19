@@ -73,6 +73,10 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.restoring_auto = False
         self.update_background_status()
         self.refresh()
+        if self.auto_enabled:
+            # Reconcile the persisted opt-in with the actual Linux timer on startup.
+            threading.Thread(target=self.background_toggle_worker,
+                             args=(True,), daemon=True).start()
 
     def build_shell(self):
         shell = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
@@ -500,7 +504,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         intro.append(label(
             "Para CRIAR, EDITAR, RENOMEAR ou EXCLUIR no disco virtual, ative a gravação e REMONTE o Drive. O modo padrão é SOMENTE LEITURA. Para trabalhar em documentos, "
             "prefira a pasta espelhada. A gravação pela montagem usa cache FUSE "
-            "e pode gerar conflitos com edições remotas.",
+            "e depende do acesso ao Google. Se a API bloquear com erro 403, novas "
+            "gravações podem ficar pendentes e causar conflitos.",
             "drive-muted", wrap=True))
         start = action("Montar Drive", self.start_mount, "media-playback-start-symbolic",
                        primary=True)
@@ -1464,8 +1469,10 @@ class DriveWindow(Gtk.ApplicationWindow):
         if not self.auto_enabled:
             message = "Pausada. Nenhum ciclo automático programado."
         elif state == "ok":
-            message = (str(status.get("copied", 0)) +
-                       " arquivo(s) no último ciclo. " + str(status.get("time", "")))
+            message = (str(status.get("copied", 0)) + " arquivo(s) transferido(s), " +
+                       str(status.get("pending", 0)) + " pendente(s), " +
+                       str(status.get("archived", 0)) + " arquivado(s). " +
+                       str(status.get("time", "")))
         elif state == "conflicts":
             message = (str(status.get("conflicts", 0)) +
                        " conflito(s) pendente(s). " + str(status.get("time", "")))
