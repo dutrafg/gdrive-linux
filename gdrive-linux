@@ -28,6 +28,7 @@ from tray_autostart import set_indicator_autostart, indicator_enabled, indicator
 from photos_export import upload_media
 from desktop_files import find_openable_file
 from deletion_review import load_candidates, archive_deletion
+from backup_recovery import list_local_backups, restore_local_backup, recovery_root
 from diagnostics import collect_diagnostics, format_report
 from rclone_errors import friendly, is_rate_limit
 from ui_kit import label, card, action, nav, format_size, section_title, row, button_flow
@@ -472,6 +473,24 @@ class DriveWindow(Gtk.ApplicationWindow):
         conflicts.append(action("Revisar exclusões com arquivamento recuperável",
                                 self.review_deletions, "document-open-recent-symbolic"))
         sync_page.append(conflicts)
+        recovery = card("Restaurar versões anteriores",
+                        "Recupere cópias locais arquivadas sem modificar o Drive "
+                        "nem substituir arquivos da pasta sincronizada.",
+                        "document-revert-symbolic")
+        self.recovery_list = Gtk.ListBox()
+        self.recovery_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        self.recovery_list.add_css_class("drive-history")
+        self.recovery_items = []
+        recovery.append(self.recovery_list)
+        recovery.append(button_flow(
+            action("Procurar versões arquivadas", self.find_recovery_items,
+                   "system-search-symbolic"),
+            action("Restaurar cópia selecionada", self.confirm_recovery,
+                   "document-revert-symbolic", primary=True)))
+        self.recovery_info = label("As cópias restauradas ficam em Documents/DriveRecuperados "
+                                   "fora da sincronização.", "drive-muted", wrap=True)
+        recovery.append(self.recovery_info)
+        sync_page.append(recovery)
         self.pages.add_titled(sync_page, "sync", "Sincronização")
 
     def build_activity(self):
@@ -753,6 +772,76 @@ class DriveWindow(Gtk.ApplicationWindow):
                               account=self.selected_remote() or "",
                               folder=str(self.folder)))
         GLib.idle_add(self.diagnostics_text.set_text, format_report(report))
+
+    def find_recovery_items(self, *_):
+        remote = self.selected_remote()
+        if not remote:
+            self.notice("Selecione a conta para procurar cópias.", "warning")
+            return
+        self.recovery_info.set_text("Procurando versões anteriores deste perfil…")
+        threading.Thread(target=self.recovery_worker,
+                         args=(remote, self.folder), daemon=True).start()
+
+    def recovery_worker(self, remote, folder):
+        try:
+            items = list_local_backups(remote, folder)
+        except (OSError, ValueError):
+            items = []
+        GLib.idle_add(self.recovery_complete, items)
+
+    def recovery_complete(self, items):
+        self.recovery_items = items
+        while self.recovery_list.get_row_at_index(0) is not None:
+            self.recovery_list.remove(self.recovery_list.get_row_at_index(0))
+        for i, item in enumerate(items):
+            row = Gtk.ListBoxRow()
+            row.recovery_index = i
+            row.set_child(label(item.relative, wrap=True))
+            self.recovery_list.append(row)
+        self.recovery_info.set_text(
+            str(len(items)) + " versão(ões) disponíveis para recuperação." if items
+            else "Nenhuma cópia local arquivada encontrada nesta conta/pasta.")
+        return False
+
+    def confirm_recovery(self, *_):
+        selected = self.recovery_list.get_selected_row()
+        if selected is None:
+            self.notice("Selecione uma versão na lista antes de restaurar.", "warning")
+            return
+        item = self.recovery_items[selected.recovery_index]
+        dialog = Gtk.Window(title="Confirmar recuperação de arquivo",
+                            transient_for=self, modal=True)
+        dialog.set_default_size(540, 270)
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        for edge in ("top", "bottom", "start", "end"):
+            getattr(content, "set_margin_" + edge)(20)
+        dialog.set_child(content)
+        content.append(section_title("Recuperar cópia arquivada?",
+            "Arquivo: " + item.relative + "\nSerá criada uma nova cópia em " +
+            str(recovery_root()) + ". O backup original e o Google Drive "
+            "não serão modificados."))
+        content.append(action("Cancelar", lambda *_: dialog.close()))
+        def confirm(_button):
+            dialog.close()
+            self.recovery_info.set_text("Recuperando cópia sem sobrescrever arquivos…")
+            threading.Thread(target=self.recovery_restore_worker,
+                             args=(item,), daemon=True).start()
+        content.append(action("Restaurar cópia segura", confirm,
+                              "document-revert-symbolic", primary=True))
+        dialog.present()
+
+    def recovery_restore_worker(self, item):
+        try:
+            dest = restore_local_backup(item)
+            result = (True, "Cópia restaurada em: " + str(dest))
+        except (OSError, ValueError) as exc:
+            result = (False, "Não foi possível restaurar: " + str(exc))
+        GLib.idle_add(self.recovery_restore_complete, *result)
+
+    def recovery_restore_complete(self, success, message):
+        self.recovery_info.set_text(message)
+        self.notice(message, "success" if success else "warning")
+        return False
 
     def review_deletions(self, *_):
         remote = self.selected_remote()
