@@ -2312,7 +2312,7 @@ def ui_smoke():
         raise RuntimeError("GTK4 application registration failed")
     window = DriveWindow(app)
     expected = ("home", "accounts", "files", "sync", "activity", "history",
-                "settings", "mount", "photos")
+                "settings", "mount", "photos", "docs")
     if not window.has_css_class("drive-window"):
         raise AssertionError("Missing application CSS class")
     for page in expected:
@@ -2344,6 +2344,11 @@ def ui_smoke():
         raise AssertionError("Continuous background service status missing")
     if not hasattr(window, "search_entry"):
         raise AssertionError("Drive search control missing")
+    for attribute in ("mount_preflight_text", "mount_startup_switch",
+                      "profile_list", "sync_mode_dropdown", "docs_format",
+                      "tray_switch", "include_entry", "exclude_entry"):
+        if not hasattr(window, attribute):
+            raise AssertionError("Missing GTK4 widget: " + attribute)
     window.close()
     print("GTK4 UI OK: navigation, cards, labels and defaults")
     return 0
