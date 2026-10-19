@@ -12,11 +12,31 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from background_sync import (BACKUP_BASE, STATE_BASE, fingerprint, inventories,
-                             job_key, read_json, safe_local_target,
+                             job_key, read_json, safe_local_target, local_md5,
                              save_private_json)
 from rclone_backend import list_remotes, remote_path
 from sync_plan import validate_relative
+from sync_filters import filtered_inventory, parse_rules
+from settings import load_settings
 
+
+def selected_rules(remote, folder, configuration=None):
+    """Manual review must honor the same selected folders as auto sync."""
+    options = load_settings() if configuration is None else configuration
+    configured = options.get("sync_profiles", [])
+    for profile in configured:
+        if (profile.get("account") == remote and
+                Path(profile.get("folder", "")).expanduser().resolve() == folder):
+            return (parse_rules(profile.get("sync_includes", [])),
+                    parse_rules(profile.get("sync_excludes", [])))
+    if configured:
+        # Do not review a different account with another profile's history.
+        raise ValueError("A conta e a pasta não correspondem a um perfil ativo.")
+    if (options.get("account") == remote and
+            Path(options.get("folder", "")).expanduser().resolve() == folder):
+        return (parse_rules(options.get("sync_includes", [])),
+                parse_rules(options.get("sync_excludes", [])))
+    return [], []
 
 def find_deletions(local, cloud, baseline):
     candidates = []
@@ -37,7 +57,9 @@ def load_candidates(remote, folder, state_base=STATE_BASE):
     baseline = snapshot.get("md5", {})
     if not isinstance(baseline, dict):
         raise ValueError("Histórico de sincronização inválido.")
-    local, cloud = inventories(remote, base)
+    includes, excludes = selected_rules(remote, base)
+    local, cloud = inventories(remote, base, includes, excludes)
+    baseline = filtered_inventory(baseline, includes, excludes)
     return find_deletions(local, cloud, baseline)
 
 
@@ -62,12 +84,16 @@ def archive_deletion(remote, folder, relative, missing_side,
             raise RuntimeError("Aguarde o ciclo de sincronização atual.")
         snapshot_path = state_base / (key + ".json")
         baseline = read_json(snapshot_path).get("md5", {})
-        local, cloud = inventories(remote, base)
-        if (relative, missing_side) not in find_deletions(local, cloud, baseline):
+        includes, excludes = selected_rules(remote, base)
+        local, cloud = inventories(remote, base, includes, excludes)
+        visible_baseline = filtered_inventory(baseline, includes, excludes)
+        if (relative, missing_side) not in find_deletions(local, cloud, visible_baseline):
             raise ValueError("A exclusão mudou desde a análise; examine novamente.")
         run = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:10]
         if missing_side == "cloud":
             source = safe_local_target(base, relative)
+            if not source.is_file() or local_md5(source) != visible_baseline[relative]:
+                raise ValueError("O arquivo mudou antes de arquivar; operação cancelada.")
             archive_root = Path(backup_base).expanduser().resolve() / key / "deleted" / run
             destination = archive_root / relative
             if not destination.resolve().is_relative_to(archive_root):
