@@ -77,6 +77,17 @@ def safe_local_target(root, relative):
         ancestor = ancestor.parent
     return target
 
+def local_md5(path):
+    """Recheck the surviving file just before any opt-in local archiving."""
+    digest = hashlib.md5()
+    with Path(path).open("rb") as source:
+        while True:
+            data = source.read(1024 * 1024)
+            if not data:
+                break
+            digest.update(data)
+    return digest.hexdigest()
+
 def job_key(remote, folder):
     return hashlib.sha256((remote + "\0" + str(folder.resolve())).encode()).hexdigest()[:24]
 
@@ -160,6 +171,10 @@ def archive_unilateral_deletions(remote, folder, local, cloud, baseline,
             if fingerprint(local[relative]) != old:
                 continue
             target = safe_local_target(folder, relative)
+            if not target.is_file() or local_md5(target) != old:
+                # The user edited this file since the previous inventory.
+                # Never move the freshly edited copy out of their workspace.
+                continue
             archive_root = backup_base / job_key(remote, folder) / "deleted" / run_id
             archive = archive_root / relative
             archive.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
