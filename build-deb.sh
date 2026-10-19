@@ -26,8 +26,8 @@ Version: $version
 Section: utils
 Priority: optional
 Architecture: all
-Depends: python3 (>= 3.9), python3-gi, gir1.2-gtk-4.0
-Recommends: rclone, fuse3, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1
+Depends: python3 (>= 3.9), python3-gi, gir1.2-gtk-4.0, rclone, fuse3
+Recommends: gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1
 Maintainer: Drive para Linux <noreply@example.invalid>
 Description: Cliente GTK4 para Google Drive usando rclone
 EOF
