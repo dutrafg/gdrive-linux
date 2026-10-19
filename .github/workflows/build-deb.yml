@@ -139,6 +139,11 @@ jobs:
           test -f /usr/share/gdrive-linux/photos_export.py
           test -f /usr/share/gdrive-linux/sync_profiles.py
           test -f /usr/share/gdrive-linux/mount_checks.py
+          # Executed from the installed package, not the checked-out source tree.
+          cd /tmp
+          /usr/bin/python3 /usr/share/gdrive-linux/mount_checks.py > /tmp/gdrive-installed-preflight.txt
+          grep -q 'rclone' /tmp/gdrive-installed-preflight.txt
+          grep -q 'FUSE' /tmp/gdrive-installed-preflight.txt
           test -f /usr/share/gdrive-linux/google_docs_export.py
           test -f /usr/share/applications/gdrive-linux-indicator.desktop
           test -f /usr/share/applications/gdrive-linux.desktop
