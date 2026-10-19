@@ -49,3 +49,14 @@ class AutomaticCopySafetyTests(unittest.TestCase):
                 copy_command("drive", Path(folder), "upload", preserve_newer=True)
 
 
+
+class NonDestructiveAutoDownloadTests(unittest.TestCase):
+    def test_auto_download_skips_existing(self):
+        with tempfile.TemporaryDirectory() as folder:
+            cmd = b.copy_command('drive', folder, 'download', skip_existing=True)
+            self.assertIn('--ignore-existing', cmd)
+
+    def test_upload_cannot_skip_existing(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaises(ValueError):
+                b.copy_command('drive', folder, 'upload', skip_existing=True)
