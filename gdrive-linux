@@ -18,6 +18,7 @@ from background_sync import read_json, STATE_BASE
 from mount_drive import command as mount_command, mount_path, MOUNT_ROOT
 from mount_health import mount_diagnosis, mount_ready, service_state, service_journal
 from mount_autostart import autostart_enabled, update_autostart
+from sync_filters import parse_entry, parse_rules
 from photos_export import upload_media
 from desktop_files import find_openable_file
 from deletion_review import load_candidates, archive_deletion
@@ -37,6 +38,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.sync_busy = False
         self.mount_busy = False
         self.mount_autostart_busy = False
+        self.mount_autostart_on = False
         self.restoring_mount_autostart = False
         self.photos_busy = False
         self.verify_generation = 0
@@ -58,6 +60,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.account_names = self.preferences.get("account_names", {})
         self.mount_read_only = self.preferences.get("mount_read_only", True) is not False
         self.auto_archive_deletions = self.preferences.get("auto_archive_deletions", False) is True
+        self.sync_includes = self.preferences.get("sync_includes", [])
+        self.sync_excludes = self.preferences.get("sync_excludes", [])
         self.search_mode = False
         self.folder = Path(self.preferences.get(
             "folder", str(Path.home() / "GoogleDrive"))).expanduser()
@@ -391,6 +395,28 @@ class DriveWindow(Gtk.ApplicationWindow):
                                    "go-next-symbolic", primary=True))
         manual.append(sync_actions)
         sync_page.append(self.make_columns(automatic, manual))
+        filters = card("Selecionar e ignorar arquivos (estilo Insync)",
+                       "Opcional. As regras valem para novos ciclos automáticos. "
+                       "Arquivos desmarcados não são apagados da nuvem nem do computador.",
+                       "view-filter-symbolic")
+        filters.append(label("Sincronizar somente (pastas ou padrões separados por vírgula):",
+                             "drive-muted", wrap=True))
+        self.include_entry = Gtk.Entry()
+        self.include_entry.set_placeholder_text("Ex.: Documentos/, Fotos/  •  vazio = tudo")
+        self.include_entry.set_text(", ".join(self.sync_includes))
+        filters.append(self.include_entry)
+        filters.append(label("Ignorar (pastas, extensões ou arquivos):",
+                             "drive-muted", wrap=True))
+        self.exclude_entry = Gtk.Entry()
+        self.exclude_entry.set_placeholder_text("Ex.: *.tmp, *.part, Cache/")
+        self.exclude_entry.set_text(", ".join(self.sync_excludes))
+        filters.append(self.exclude_entry)
+        filters.append(action("Salvar regras de sincronização", self.save_sync_filters,
+                              "document-save-symbolic", primary=True))
+        filters.append(label("Exemplos: Documentos/ inclui arquivos nessa pasta; "
+            "*.tmp ignora temporários em qualquer subpasta. O modo de sincronização "
+            "manual ainda não usa esses filtros.", "drive-muted", wrap=True))
+        sync_page.append(filters)
         conflicts = card("Conflitos e diferenças",
             "Os arquivos compartilhados divergentes não são modificados automaticamente.",
             "dialog-warning-symbolic")
@@ -714,6 +740,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             return False
         self.restoring_mount_autostart = True
         self.mount_startup_switch.set_active(active)
+        self.mount_autostart_on = active
         self.restoring_mount_autostart = False
         self.mount_startup_switch.set_sensitive(True)
         self.mount_startup_status.set_text(
@@ -760,6 +787,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.mount_autostart_busy = False
         self.restoring_mount_autostart = True
         self.mount_startup_switch.set_active(enabled)
+        self.mount_autostart_on = enabled
         self.restoring_mount_autostart = False
         self.mount_startup_switch.set_sensitive(True)
         self.mount_startup_status.set_text(message)
@@ -1016,7 +1044,8 @@ class DriveWindow(Gtk.ApplicationWindow):
             account = self.selected_remote() or ""
             save_settings(self.folder, account, self.account_names,
                           self.auto_enabled, self.mount_read_only,
-                          self.auto_archive_deletions)
+                          self.auto_archive_deletions,
+                          self.sync_includes, self.sync_excludes)
             self.preferences["account"] = account
             self.preferences["folder"] = str(self.folder)
         except OSError as exc:
@@ -1027,7 +1056,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             return
         previous = self.preferences.get("account", "")
         requested = self.selected_remote()
-        if self.auto_enabled and previous and requested != previous:
+        if (self.auto_enabled or self.mount_autostart_on) and previous and requested != previous:
             self.restoring_accounts = True
             try:
                 names = [self.remotes.get_string(i) for i in
@@ -1036,7 +1065,8 @@ class DriveWindow(Gtk.ApplicationWindow):
                     self.dropdown.set_selected(names.index(previous))
             finally:
                 self.restoring_accounts = False
-            self.notice("Pause a sincronização contínua antes de trocar a conta.", "warning")
+            self.notice("Desative a sincronização contínua e a montagem automática "
+                        "antes de trocar a conta.", "warning")
             return
         self.persist()
         self.verify_generation += 1
@@ -1424,6 +1454,18 @@ class DriveWindow(Gtk.ApplicationWindow):
                           "utilities-terminal-symbolic", primary=True))
         box.append(action("Fechar", lambda *_: dialog.close()))
         dialog.present()
+
+    def save_sync_filters(self, *_):
+        try:
+            includes = parse_entry(self.include_entry.get_text())
+            excludes = parse_entry(self.exclude_entry.get_text())
+        except ValueError as exc:
+            self.notice("Filtros inválidos: " + str(exc), "warning")
+            return
+        self.sync_includes, self.sync_excludes = includes, excludes
+        self.persist()
+        self.notice("Regras salvas para os próximos ciclos automáticos. "
+                    "Nenhum arquivo foi removido.", "success")
 
     def archive_changed(self, switch, *_):
         if self.restoring_auto:
