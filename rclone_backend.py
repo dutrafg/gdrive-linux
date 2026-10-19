@@ -44,8 +44,8 @@ def copy_command(remote, local_folder, direction, preserve_newer=False, skip_exi
                '--retries', '3', '--low-level-retries', '5',
                '--transfers', '1', '--checkers', '1'] + rclone_limits()
     if skip_existing:
-        if direction != 'download':
-            raise ValueError('Proteção de arquivos existentes disponível somente para download')
+        # Safe both for upload and download. Never overwrite existing files
+        # unless the user explicitly opts out of this protection.
         command.append('--ignore-existing')
     if preserve_newer:
         if direction != 'download':
