@@ -10,7 +10,11 @@ from background_sync import read_json, STATE_BASE
 def status_summary(status):
     state = status.get("state", "unknown") if isinstance(status, dict) else "unknown"
     if state == "ok":
-        return "Sincronizado - " + str(status.get("pending", 0)) + " pendentes", False
+        accounts = status.get("profiles")
+        count = len(accounts) if isinstance(accounts, list) else 0
+        prefix = (str(count) + " conta(s) • " if count else "")
+        return (prefix + "Sincronizado - " +
+                str(status.get("pending", 0)) + " pendentes", False)
     if state == "quota":
         return "Google Drive: limite da API (403)", True
     if state == "conflicts":
