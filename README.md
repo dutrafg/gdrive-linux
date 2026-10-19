@@ -1,6 +1,6 @@
 # Drive para Linux
 
-Cliente experimental **GTK4** para acessar o Google Drive no Linux usando **rclone**. Versão atual: **0.9.8 Alpha**. Não é um cliente oficial do Google.
+Cliente experimental **GTK4** para acessar o Google Drive no Linux usando **rclone**. Versão atual: **0.9.9 Alpha**. Não é um cliente oficial do Google.
 
 ## Funcionalidades
 
@@ -9,10 +9,11 @@ Cliente experimental **GTK4** para acessar o Google Drive no Linux usando **rclo
 - Upload e download manuais usando `rclone copy`.
 - Atualização automática opcional a cada cinco minutos **enquanto o aplicativo está aberto**, apenas da nuvem para a pasta local; não exclui arquivos e usa `--ignore-existing` para não substituir nenhum arquivo local existente; alterações remotas em arquivos já baixados não são aplicadas automaticamente.
 - Botão para abrir a pasta local no gerenciador padrão do ambiente Linux.
+- **Simulação** de sincronização bidirecional: compara inventários e identifica arquivos exclusivos e conflitos sem transferir ou excluir arquivos. A comparação é conservadora: hashes de algoritmos diferentes são tratados como conflito, mesmo quando o conteúdo pode ser idêntico.
 - Barra de progresso baseada nas estatísticas do rclone, logs, estados de conclusão/falha/cancelamento e histórico **apenas da sessão**.
 - Pasta local configurável e preferências salvas em `~/.config/gdrive-linux/settings.json` (sem tokens OAuth).
 
-**Limitações:** não há sincronização bidirecional, sincronização em segundo plano com o aplicativo fechado, montagem virtual, login OAuth dentro da própria janela, sem navegador externo, histórico persistente ou integração profunda com gerenciador de arquivos. O aplicativo ainda precisa de validação funcional em diferentes distribuições.
+**Limitações:** não há execução de sincronização bidirecional (apenas simulação), sincronização em segundo plano com o aplicativo fechado, montagem virtual, login OAuth dentro da própria janela, sem navegador externo, histórico persistente ou integração profunda com gerenciador de arquivos. O aplicativo ainda precisa de validação funcional em diferentes distribuições.
 
 ## Instalação e execução
 
@@ -24,7 +25,7 @@ sudo apt install python3 python3-gi gir1.2-gtk-4.0 rclone
 python3 gdrive-linux
 ```
 
-Para instalar o pacote `.deb`, baixe o artefato da execução aprovada em [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions) e instale com `sudo apt install ./gdrive-linux_0.9.8_all.deb`. O arquivo só estará disponível após o workflow gerar o artefato.
+Para instalar o pacote `.deb`, baixe o artefato da execução aprovada em [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions) e instale com `sudo apt install ./gdrive-linux_0.9.9_all.deb`. O arquivo só estará disponível após o workflow gerar o artefato.
 
 ## Configuração da conta
 
@@ -42,4 +43,4 @@ O workflow `.github/workflows/build-deb.yml` executa compilação sintática Pyt
 
 ## Versionamento
 
-Até **0.9.8**, versões Alpha. **1.0.0 Beta** será o marco de início da fase Beta, sujeito a QA; depois seguem versões incrementais. Consulte [SECURITY.md](SECURITY.md) para cuidados de autenticação, permissões e divulgação de vulnerabilidades.
+Até **0.9.9**, versões Alpha. **1.0.0 Beta** será o marco de início da fase Beta, sujeito a QA; depois seguem versões incrementais. Consulte [SECURITY.md](SECURITY.md) para cuidados de autenticação, permissões e divulgação de vulnerabilidades.
