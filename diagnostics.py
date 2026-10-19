@@ -7,6 +7,7 @@ from pathlib import Path
 
 from settings import load_settings
 from mount_drive import mount_path
+from mount_health import mount_diagnosis
 
 def run_probe(argv, timeout=15):
     try:
@@ -57,7 +58,7 @@ def collect_diagnostics(config=None):
         except ValueError:
             mounted = False
         add("Disco virtual", mounted, "Montado" if mounted else
-            "Não montado (recurso opcional).")
+            mount_diagnosis(mount_path(remote)))
     return items
 
 def format_report(items):
