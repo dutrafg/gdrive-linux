@@ -3,6 +3,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
+from rclone_errors import rclone_limits
 
 REMOTE_RE = re.compile(r'^[^:\r\n/\\]+$')
 
@@ -21,7 +22,7 @@ def list_remotes(timeout=15):
 
 def list_files(remote, relative='', timeout=60):
     result = subprocess.run(['rclone', 'lsjson', remote_path(remote, relative),
-                             '--max-depth', '1', '--no-mimetype'],
+                             '--max-depth', '1', '--no-mimetype'] + rclone_limits(),
                             capture_output=True, text=True, check=True, timeout=timeout)
     entries = json.loads(result.stdout)
     if not isinstance(entries, list):
@@ -39,7 +40,8 @@ def copy_command(remote, local_folder, direction, preserve_newer=False, skip_exi
     cloud = remote_path(remote)
     source, dest = (str(local), cloud) if direction == 'upload' else (cloud, str(local))
     command = ['rclone', 'copy', source, dest, '--stats', '1s', '--stats-one-line', '--stats-log-level', 'NOTICE', '--log-level', 'NOTICE',
-               '--retries', '3', '--low-level-retries', '5']
+               '--retries', '3', '--low-level-retries', '5',
+               '--transfers', '1', '--checkers', '1'] + rclone_limits()
     if skip_existing:
         if direction != 'download':
             raise ValueError('Proteção de arquivos existentes disponível somente para download')
@@ -57,7 +59,7 @@ def search_files(remote, term, timeout=120, limit=100):
         raise ValueError("Digite pelo menos 2 caracteres para pesquisar.")
     result = subprocess.run(
         ['rclone', 'lsjson', remote_path(remote), '--recursive', '--files-only',
-         '--no-mimetype'], capture_output=True, text=True, check=True, timeout=timeout)
+         '--no-mimetype'] + rclone_limits(), capture_output=True, text=True, check=True, timeout=timeout)
     entries = json.loads(result.stdout)
     if not isinstance(entries, list):
         raise ValueError("Resposta de pesquisa inválida")
