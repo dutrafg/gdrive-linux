@@ -1,0 +1,128 @@
+#!/usr/bin/python3
+"""Drive para Linux - interface GTK para rclone."""
+import subprocess
+import threading
+from pathlib import Path
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, GLib
+
+VERSION = "0.1.1"
+
+class Window(Gtk.Window):
+    def __init__(self):
+        super().__init__(title=f"Drive para Linux · {VERSION}")
+        self.set_default_size(680, 460)
+        self.set_border_width(18)
+        self.proc = None
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.add(root)
+        title = Gtk.Label(label="Drive para Linux")
+        title.set_xalign(0)
+        root.pack_start(title, False, False, 0)
+        note = Gtk.Label(label="Transferências seguras com rclone copy (sem exclusões automáticas).")
+        note.set_xalign(0)
+        root.pack_start(note, False, False, 0)
+        accounts = Gtk.Box(spacing=8)
+        root.pack_start(accounts, False, False, 0)
+        accounts.pack_start(Gtk.Label(label="Conta:"), False, False, 0)
+        self.remote = Gtk.ComboBoxText()
+        accounts.pack_start(self.remote, True, True, 0)
+        refresh = Gtk.Button(label="Atualizar contas")
+        refresh.connect("clicked", lambda *_: self.refresh())
+        accounts.pack_start(refresh, False, False, 0)
+        setup = Gtk.Button(label="Configurar conta")
+        setup.connect("clicked", self.configure)
+        accounts.pack_start(setup, False, False, 0)
+        folders = Gtk.Box(spacing=8)
+        root.pack_start(folders, False, False, 0)
+        folders.pack_start(Gtk.Label(label="Pasta local:"), False, False, 0)
+        self.folder = Gtk.FileChooserButton(title="Escolher pasta", action=Gtk.FileChooserAction.SELECT_FOLDER)
+        default = Path.home() / "GoogleDrive"
+        default.mkdir(exist_ok=True)
+        self.folder.set_filename(str(default))
+        folders.pack_start(self.folder, True, True, 0)
+        actions = Gtk.Box(spacing=8)
+        root.pack_start(actions, False, False, 0)
+        for label, direction in (("Baixar da nuvem", "download"), ("Enviar para nuvem", "upload")):
+            button = Gtk.Button(label=label)
+            button.connect("clicked", self.transfer, direction)
+            actions.pack_start(button, True, True, 0)
+        self.stop = Gtk.Button(label="Cancelar")
+        self.stop.connect("clicked", self.cancel)
+        self.stop.set_sensitive(False)
+        root.pack_start(self.stop, False, False, 0)
+        self.status = Gtk.Label(label="Pronto.")
+        self.status.set_xalign(0)
+        self.status.set_line_wrap(True)
+        root.pack_start(self.status, False, False, 0)
+        scroll = Gtk.ScrolledWindow()
+        root.pack_start(scroll, True, True, 0)
+        self.log = Gtk.TextView()
+        self.log.set_editable(False)
+        self.log.set_monospace(True)
+        scroll.add(self.log)
+        self.refresh()
+
+    def configure(self, *_):
+        try:
+            subprocess.Popen(["x-terminal-emulator", "-e", "rclone", "config"])
+            self.status.set_text("Conclua a configuração no terminal e clique em Atualizar contas.")
+        except OSError as exc:
+            self.status.set_text(f"Não foi possível abrir o terminal: {exc}. Execute rclone config manualmente.")
+
+    def refresh(self):
+        self.remote.remove_all()
+        try:
+            result = subprocess.run(["rclone", "listremotes"], capture_output=True, text=True, timeout=15, check=True)
+            for name in result.stdout.splitlines():
+                if name.strip():
+                    self.remote.append_text(name.strip().rstrip(":"))
+            self.remote.set_active(0)
+            if not self.remote.get_active_text():
+                self.status.set_text("Nenhuma conta encontrada. Configure uma conta primeiro.")
+        except (OSError, subprocess.SubprocessError) as exc:
+            self.status.set_text(f"Erro ao consultar contas: {exc}")
+
+    def append(self, line):
+        buf = self.log.get_buffer()
+        buf.insert(buf.get_end_iter(), line + "\n")
+        return False
+
+    def transfer(self, _button, direction):
+        if self.proc is not None:
+            return
+        remote = self.remote.get_active_text()
+        local = self.folder.get_filename()
+        if not remote or not local:
+            self.status.set_text("Selecione uma conta e uma pasta.")
+            return
+        src, dst = (remote + ":", local) if direction == "download" else (local, remote + ":")
+        self.status.set_text("Transferência em andamento…")
+        self.stop.set_sensitive(True)
+        threading.Thread(target=self.worker, args=(src, dst), daemon=True).start()
+
+    def worker(self, src, dst):
+        try:
+            proc = subprocess.Popen(["rclone", "copy", src, dst, "--progress", "--stats", "5s", "--log-level", "INFO"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            self.proc = proc
+            for line in proc.stdout:
+                GLib.idle_add(self.append, line.rstrip())
+            code = proc.wait()
+            GLib.idle_add(self.status.set_text, "Transferência concluída." if code == 0 else f"Transferência interrompida (código {code}).")
+        except OSError as exc:
+            GLib.idle_add(self.status.set_text, str(exc))
+        finally:
+            self.proc = None
+            GLib.idle_add(self.stop.set_sensitive, False)
+
+    def cancel(self, *_):
+        if self.proc is not None:
+            self.proc.terminate()
+
+if __name__ == "__main__":
+    window = Window()
+    window.connect("destroy", Gtk.main_quit)
+    window.show_all()
+    Gtk.main()
