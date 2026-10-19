@@ -314,7 +314,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         folder_card.append(folder_buttons)
         accounts_page.append(self.make_columns(account_card, folder_card))
         manual = card("Transferências manuais",
-            "Atenção: transferências manuais podem substituir arquivos com o mesmo nome.",
+            "Preserva arquivos existentes por padrão; sobrescrita somente por escolha explícita.",
             "folder-download-symbolic")
         manual_buttons = button_flow()
         self.download = action("Baixar da nuvem", lambda *_: self.confirm_transfer("download"),
@@ -2374,20 +2374,24 @@ class DriveWindow(Gtk.ApplicationWindow):
         dialog.set_child(panel)
         panel.append(section_title(
             "Confirmar " + ("download" if direction == "download" else "upload"),
-            "A cópia manual pode substituir arquivos no destino, "
-            "mas não remove arquivos que existam somente no destino."))
+            "Por padrão, arquivos já presentes no destino serão preservados. "
+            "Somente desative essa proteção para substituir arquivos conscientemente."))
         panel.append(label("Conta: " + str(self.selected_remote()) +
                            "   •   Pasta: " + str(self.folder), "drive-muted", wrap=True))
+        keep_existing = Gtk.CheckButton(
+            label="Preservar arquivos já existentes no destino (recomendado)")
+        keep_existing.set_active(True)
+        panel.append(keep_existing)
         buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         buttons.append(action("Voltar", lambda *_: dialog.close()))
         def proceed(_button):
             dialog.close()
-            self.transfer(None, direction)
+            self.transfer(None, direction, protect_existing=keep_existing.get_active())
         buttons.append(action("Confirmar e iniciar", proceed, primary=True))
         panel.append(buttons)
         dialog.present()
 
-    def transfer(self, _button, direction, automatic=False):
+    def transfer(self, _button, direction, automatic=False, protect_existing=True):
         if self.busy or self.sync_busy:
             return
         index = self.dropdown.get_selected()
@@ -2396,7 +2400,8 @@ class DriveWindow(Gtk.ApplicationWindow):
             return
         local = str(self.folder)
         try:
-            command = copy_command(self.remotes.get_string(index), local, direction, skip_existing=automatic)
+            command = copy_command(self.remotes.get_string(index), local, direction,
+                                   skip_existing=(automatic or protect_existing))
         except ValueError as exc:
             self.status.set_text(str(exc))
             return
