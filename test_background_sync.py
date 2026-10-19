@@ -82,6 +82,14 @@ class SafePlanTests(unittest.TestCase):
             {"state": "conflicts", "conflicts": 2},
             {"state": "conflicts", "conflicts": 2}))
 
+    @patch("background_sync.list_remotes", return_value=["demo"])
+    def test_refuses_home_directory_as_mirror(self, remotes):
+        from pathlib import Path
+        with self.assertRaises(ValueError):
+            run_once(config={"auto_sync_enabled": True, "account": "demo",
+                             "folder": str(Path.home())})
+        remotes.assert_not_called()
+
     def test_disabled_job_does_no_io(self):
         with patch("background_sync.list_remotes") as remotes:
             self.assertEqual(run_once(config={"auto_sync_enabled": False})["state"],
