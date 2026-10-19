@@ -51,6 +51,318 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.navigate("home")
         self.refresh()
 
+    def build_shell(self):
+        shell = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        self.set_child(shell)
+        sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=7)
+        sidebar.add_css_class("drive-sidebar")
+        shell.append(sidebar)
+        sidebar.append(label("◈  Drive para Linux", "drive-brand", wrap=True))
+        sidebar.append(label("Google Drive com rclone", "drive-side-muted"))
+        line = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        line.add_css_class("drive-side-divider")
+        sidebar.append(line)
+        sidebar.append(label("NAVEGAÇÃO", "drive-side-section"))
+        self.nav_buttons = {}
+        nav_items = (
+            ("home", "Início", "go-home-symbolic"),
+            ("accounts", "Contas", "system-users-symbolic"),
+            ("files", "Arquivos", "folder-symbolic"),
+            ("sync", "Sincronização", "emblem-synchronizing-symbolic"),
+            ("activity", "Transferências", "folder-download-symbolic"),
+            ("history", "Histórico", "document-open-recent-symbolic"),
+            ("settings", "Configurações", "emblem-system-symbolic"),
+        )
+        for key, title, icon in nav_items:
+            button = nav(title, icon, lambda _button, page=key: self.navigate(page))
+            self.nav_buttons[key] = button
+            sidebar.append(button)
+        sidebar.append(Gtk.Box(vexpand=True))
+        self.sidebar_rclone = label("●  Verificando rclone…", "drive-side-muted", wrap=True)
+        sidebar.append(self.sidebar_rclone)
+        sidebar.append(label("Alpha • v" + VERSION, "drive-side-muted"))
+        content_scroll = Gtk.ScrolledWindow()
+        content_scroll.set_hexpand(True)
+        content_scroll.set_vexpand(True)
+        content_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        shell.append(content_scroll)
+        self.content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        self.content.add_css_class("drive-content")
+        content_scroll.set_child(self.content)
+        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        header.add_css_class("drive-header")
+        self.content.append(header)
+        heading = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        heading.set_hexpand(True)
+        header.append(heading)
+        self.header_title = label("Início", "drive-page-title")
+        heading.append(self.header_title)
+        self.header_subtitle = label("Seu Google Drive com segurança", "drive-muted", wrap=True)
+        heading.append(self.header_subtitle)
+        self.header_connect = action("+  Conectar Google", self.connect_google,
+                                     "list-add-symbolic", primary=True)
+        self.header_connect.set_valign(Gtk.Align.CENTER)
+        header.append(self.header_connect)
+        self.status = label("Pronto para começar. Conecte uma conta Google.",
+                            "drive-status", wrap=True)
+        self.content.append(self.status)
+        self.pages = Gtk.Stack()
+        self.pages.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.pages.set_vexpand(True)
+        self.content.append(self.pages)
+
+    def navigate(self, page):
+        pages = {
+            "home": ("Início", "Seu Google Drive, organizado e protegido."),
+            "accounts": ("Contas", "Conexão Google e pastas locais."),
+            "files": ("Arquivos", "Navegue pelos documentos no Google Drive."),
+            "sync": ("Sincronização", "Compare e transfira arquivos novos com segurança."),
+            "activity": ("Transferências", "Acompanhe o progresso e os registros do rclone."),
+            "history": ("Histórico", "Operações desta sessão do aplicativo."),
+            "settings": ("Configurações", "Preferências, automação e diagnóstico."),
+        }
+        if page not in pages:
+            return
+        self.pages.set_visible_child_name(page)
+        self.header_title.set_text(pages[page][0])
+        self.header_subtitle.set_text(pages[page][1])
+        for key, button in self.nav_buttons.items():
+            button.remove_css_class("drive-selected")
+            if key == page:
+                button.add_css_class("drive-selected")
+
+    def make_columns(self, *cards):
+        grid = Gtk.FlowBox()
+        grid.set_min_children_per_line(1)
+        grid.set_max_children_per_line(2)
+        grid.set_column_spacing(14)
+        grid.set_row_spacing(14)
+        grid.set_homogeneous(True)
+        grid.set_selection_mode(Gtk.SelectionMode.NONE)
+        for child in cards:
+            child.set_size_request(272, -1)
+            child.set_hexpand(True)
+            grid.insert(child, -1)
+        return grid
+
+    def build_pages(self):
+        self.build_home()
+        self.build_accounts()
+        self.build_files()
+        self.build_sync()
+        self.build_activity()
+        self.build_history()
+        self.build_settings()
+
+    def build_home(self):
+        home = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        home.append(section_title("Bem-vindo!",
+            "Conecte uma conta para ver arquivos e transferências do seu Google Drive."))
+        accounts = card("Contas Google", "Conecte ou selecione uma conta existente.",
+                        "system-users-symbolic")
+        self.home_accounts = label("Consultando contas…", "drive-metric", wrap=True)
+        accounts.append(self.home_accounts)
+        accounts.append(action("Adicionar conta Google", self.connect_google,
+                               "list-add-symbolic", primary=True))
+        folder = card("Pasta local", "Diretório usado para baixar e enviar arquivos.",
+                      "folder-symbolic")
+        self.home_folder = label(str(self.folder), "drive-muted", wrap=True)
+        folder.append(self.home_folder)
+        folder.append(action("Abrir pasta", self.open_local_folder, "folder-open-symbolic"))
+        sync = card("Sincronização protegida",
+                    "Sem exclusões automáticas. Arquivos em conflito são preservados.",
+                    "emblem-synchronizing-symbolic")
+        self.home_sync = label("Nenhuma verificação iniciada.", "drive-muted", wrap=True)
+        sync.append(self.home_sync)
+        sync.append(action("Examinar sincronização", lambda *_: self.navigate("sync"),
+                           "view-refresh-symbolic"))
+        recent = card("Última atividade", "Acompanhe downloads e uploads do rclone.",
+                      "document-open-recent-symbolic")
+        self.home_activity = label("Nenhuma transferência nesta sessão.",
+                                   "drive-muted", wrap=True)
+        recent.append(self.home_activity)
+        recent.append(action("Ver transferências", lambda *_: self.navigate("activity"),
+                             "go-next-symbolic"))
+        home.append(self.make_columns(accounts, folder, sync, recent))
+        self.pages.add_titled(home, "home", "Início")
+
+    def build_accounts(self):
+        accounts_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        account_card = card("Conta Google Drive",
+            "Selecione uma conta ou inicie uma conexão segura pelo navegador.",
+            "system-users-symbolic")
+        account_card.append(label("Conta ativa", "drive-muted"))
+        row_remote = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        self.dropdown = Gtk.DropDown(model=self.remotes)
+        self.dropdown.set_hexpand(True)
+        row_remote.append(self.dropdown)
+        row_remote.append(action("Atualizar", self.refresh, "view-refresh-symbolic"))
+        account_card.append(row_remote)
+        account_card.append(action("Conectar outra conta", self.connect_google,
+                                   "list-add-symbolic", primary=True))
+        folder_card = card("Diretório local",
+            "Escolha uma pasta existente para as transferências.",
+            "folder-symbolic")
+        self.folder_label = label(str(self.folder), "drive-path", wrap=True)
+        folder_card.append(self.folder_label)
+        folder_buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        folder_buttons.append(action("Escolher", self.choose_folder, "folder-open-symbolic"))
+        folder_buttons.append(action("Abrir", self.open_local_folder, "go-jump-symbolic"))
+        folder_card.append(folder_buttons)
+        accounts_page.append(self.make_columns(account_card, folder_card))
+        manual = card("Transferências manuais",
+            "Atenção: transferências manuais podem substituir arquivos com o mesmo nome.",
+            "folder-download-symbolic")
+        manual_buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        self.download = action("Baixar da nuvem", lambda *_: self.transfer(None, "download"),
+                               "go-down-symbolic", primary=True)
+        self.upload = action("Enviar para nuvem", lambda *_: self.transfer(None, "upload"),
+                             "go-up-symbolic")
+        manual_buttons.append(self.download)
+        manual_buttons.append(self.upload)
+        manual.append(manual_buttons)
+        accounts_page.append(manual)
+        self.pages.add_titled(accounts_page, "accounts", "Contas")
+
+    def build_files(self):
+        files_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        files_card = card("Explorador de arquivos",
+            "Pastas e documentos são consultados diretamente no Google Drive.",
+            "folder-open-symbolic")
+        toolbar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        toolbar.add_css_class("drive-toolbar")
+        self.back_button = action("Voltar", self.go_back, "go-previous-symbolic")
+        self.back_button.set_sensitive(False)
+        toolbar.append(self.back_button)
+        self.path_label = label("Meu Drive", "drive-path", hexpand=True)
+        self.path_label.set_ellipsize(3)
+        toolbar.append(self.path_label)
+        toolbar.append(action("Atualizar", self.browse, "view-refresh-symbolic"))
+        files_card.append(toolbar)
+        names = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        names.add_css_class("drive-data-line")
+        names.append(label("NOME", "drive-small-note", hexpand=True))
+        names.append(label("TAMANHO", "drive-small-note"))
+        files_card.append(names)
+        self.files_list = Gtk.ListBox()
+        self.files_list.add_css_class("drive-file-list")
+        self.files_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        self.files_list.connect("row-activated", self.open_folder)
+        file_scroll = Gtk.ScrolledWindow()
+        file_scroll.set_min_content_height(300)
+        file_scroll.set_vexpand(True)
+        file_scroll.set_child(self.files_list)
+        files_card.append(file_scroll)
+        self.files_summary = label("Selecione uma conta e clique em Atualizar.", "drive-muted")
+        files_card.append(self.files_summary)
+        files_page.append(files_card)
+        self.pages.add_titled(files_page, "files", "Arquivos")
+
+    def build_sync(self):
+        sync_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        automatic = card("Atualização automática",
+            "A cada cinco minutos, enquanto o aplicativo estiver aberto.",
+            "view-refresh-symbolic")
+        auto_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+        auto_row.append(label("Baixar novos arquivos da nuvem", hexpand=True))
+        self.auto_switch = Gtk.Switch()
+        self.auto_switch.set_valign(Gtk.Align.CENTER)
+        self.auto_switch.connect("notify::active", self.auto_changed)
+        auto_row.append(self.auto_switch)
+        automatic.append(auto_row)
+        automatic.append(label("Não substitui arquivos locais existentes e não exclui arquivos.",
+                               "drive-muted", wrap=True))
+        manual = card("Sincronização seletiva",
+            "Simule primeiro; transfira apenas arquivos exclusivos, preservando conflitos.",
+            "emblem-synchronizing-symbolic")
+        self.sync_report = label("Nenhuma simulação executada.", "drive-muted", wrap=True)
+        manual.append(self.sync_report)
+        sync_actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        sync_actions.append(action("Simular", self.preview_sync, "system-search-symbolic"))
+        sync_actions.append(action("Transferir novos", self.safe_sync,
+                                   "go-next-symbolic", primary=True))
+        manual.append(sync_actions)
+        sync_page.append(self.make_columns(automatic, manual))
+        conflicts = card("Conflitos e diferenças",
+            "Os arquivos compartilhados divergentes não são modificados automaticamente.",
+            "dialog-warning-symbolic")
+        self.conflicts_list = Gtk.ListBox()
+        self.conflicts_list.add_css_class("drive-history")
+        conflicts_scroll = Gtk.ScrolledWindow()
+        conflicts_scroll.set_min_content_height(120)
+        conflicts_scroll.set_child(self.conflicts_list)
+        conflicts.append(conflicts_scroll)
+        sync_page.append(conflicts)
+        self.pages.add_titled(sync_page, "sync", "Sincronização")
+
+    def build_activity(self):
+        activity_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        current = card("Transferência em andamento",
+                       "Progresso conforme as estatísticas emitidas pelo rclone.",
+                       "folder-download-symbolic")
+        self.progress = Gtk.ProgressBar()
+        self.progress.set_show_text(True)
+        self.progress.set_text("Aguardando transferência")
+        current.append(self.progress)
+        self.cancel_button = action("Cancelar transferência", self.cancel,
+                                    "process-stop-symbolic", destructive=True)
+        self.cancel_button.set_sensitive(False)
+        self.cancel_button.set_halign(Gtk.Align.START)
+        current.append(self.cancel_button)
+        activity_page.append(current)
+        logs = card("Registro de atividades",
+            "Mensagens da sessão. Revise nomes de arquivos antes de compartilhar logs.",
+            "text-x-generic-symbolic")
+        self.log = Gtk.TextView()
+        self.log.set_editable(False)
+        self.log.set_cursor_visible(False)
+        self.log.set_monospace(True)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_min_content_height(220)
+        scroll.set_vexpand(True)
+        scroll.set_child(self.log)
+        logs.append(scroll)
+        activity_page.append(logs)
+        self.pages.add_titled(activity_page, "activity", "Transferências")
+
+    def build_history(self):
+        history_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        history_card = card("Histórico da sessão",
+            "Essas informações desaparecem quando você fecha o aplicativo.",
+            "document-open-recent-symbolic")
+        self.history_empty = label("Nenhuma transferência registrada.", "drive-muted")
+        history_card.append(self.history_empty)
+        self.history = Gtk.ListBox()
+        self.history.add_css_class("drive-history")
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_min_content_height(220)
+        scroll.set_child(self.history)
+        history_card.append(scroll)
+        history_page.append(history_card)
+        self.pages.add_titled(history_page, "history", "Histórico")
+
+    def build_settings(self):
+        settings_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        system = card("rclone e integração",
+            "O rclone executa a autenticação, consultas e transferências.",
+            "emblem-system-symbolic")
+        self.settings_rclone = label("Verificando instalação do rclone…", "drive-muted")
+        system.append(self.settings_rclone)
+        system.append(action("Atualizar diagnóstico", self.refresh,
+                             "view-refresh-symbolic"))
+        system.append(action("Configuração avançada (terminal)", self.configure,
+                             "utilities-terminal-symbolic"))
+        settings_page.append(system)
+        privacy = card("Privacidade e proteção",
+            "O aplicativo não solicita sua senha Google e não armazena tokens nas preferências.",
+            "security-high-symbolic")
+        privacy.append(label("Transferências manuais podem sobrescrever arquivos. "
+                             "A sincronização seletiva preserva os existentes.",
+                             "drive-muted", wrap=True))
+        privacy.append(label("Versão " + VERSION + " Alpha • GTK4 e rclone", "drive-small-note"))
+        settings_page.append(privacy)
+        self.pages.add_titled(settings_page, "settings", "Configurações")
+
     def restore_account(self):
         account = self.preferences.get("account", "")
         for index in range(self.remotes.get_n_items()):
