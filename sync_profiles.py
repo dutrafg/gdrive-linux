@@ -19,7 +19,12 @@ def normalize_profile(item):
     value = item.get("folder")
     if not isinstance(value, str) or not value or "\x00" in value:
         raise ValueError("Selecione uma pasta para esta conta.")
-    folder = Path(value).expanduser().resolve()
+    source_folder = Path(value).expanduser()
+    if source_folder.is_symlink():
+        raise ValueError("Não configure uma pasta de sincronização simbólica.")
+    folder = source_folder.resolve()
+    if folder == Path.home().resolve() or folder in Path.home().resolve().parents:
+        raise ValueError("Selecione uma subpasta exclusiva; não sincronize toda a pasta pessoal.")
     if folder == Path(folder.anchor):
         raise ValueError("Não sincronize a raiz do disco.")
     online = (Path.home() / "DriveOnline").resolve()
