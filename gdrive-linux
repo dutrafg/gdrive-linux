@@ -15,6 +15,7 @@ from google_oauth import google_config_command, verify_google_remote
 from sync_plan import local_inventory, remote_inventory, conservative_plan
 from safe_sync import execute_additions
 from background_sync import read_json, STATE_BASE
+from sync_display import profile_lines, last_activity_age
 from mount_drive import command as mount_command, mount_path, MOUNT_ROOT
 from mount_health import mount_diagnosis, mount_ready, service_state, service_journal
 from mount_checks import inspect_mount, format_mount_report, test_google_read_access
@@ -1970,6 +1971,13 @@ class DriveWindow(Gtk.ApplicationWindow):
             message = "A última verificação falhou. Revise a conexão e a pasta."
         else:
             message = "Agendada; aguardando o primeiro ciclo do systemd."
+        # Summarize individual accounts and stale cycles; never show raw logs.
+        detail = profile_lines(status)
+        age = last_activity_age(status)
+        if detail:
+            message += "\n" + "\n".join(detail)
+        if age and self.auto_enabled:
+            message += "\n" + age
         self.background_status.set_text(message)
         if self.auto_enabled:
             threading.Thread(target=self.check_timer_worker, daemon=True).start()
