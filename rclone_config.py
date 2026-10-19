@@ -6,13 +6,13 @@ rclone.conf is stored; rclone itself owns the OAuth secrets.
 import os
 from pathlib import Path
 
-def normalize_config_path(value):
+def normalize_config_path(value, require_exists=True):
     if value in (None, ""):
         return ""
     if not isinstance(value, str) or "\x00" in value or "\n" in value or "\r" in value:
         raise ValueError("Caminho da configuração rclone inválido.")
     result = Path(value).expanduser().resolve()
-    if not result.is_file():
+    if require_exists and not result.is_file():
         raise ValueError("Arquivo rclone.conf não existe.")
     return str(result)
 
