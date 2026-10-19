@@ -992,6 +992,13 @@ def ui_smoke():
         raise AssertionError("Folder labels out of sync")
     if window.auto_enabled:
         raise AssertionError("Automatic download must be opt-in")
+    actions = button_flow(Gtk.Button(label="Escolher"),
+                          Gtk.Button(label="Abrir"),
+                          Gtk.Button(label="Criar pasta"))
+    if actions.get_max_children_per_line() != 3:
+        raise AssertionError("Responsive action layout is unavailable")
+    if actions.get_selection_mode() != Gtk.SelectionMode.NONE:
+        raise AssertionError("Responsive action layout must not select buttons")
     window.close()
     print("GTK4 UI OK: navigation, cards, labels and defaults")
     return 0
