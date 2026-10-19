@@ -1,5 +1,7 @@
 import os
+import json
 import tempfile
+import concurrent.futures
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -63,6 +65,21 @@ class SettingsTests(unittest.TestCase):
                 self.assertIs(settings.load_settings()["mount_read_only"], False)
                 settings.save_settings("/tmp/drive", "pessoal")
                 self.assertIs(settings.load_settings()["mount_read_only"], True)
+
+    def test_concurrent_atomic_writes_keep_valid_json(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp) / "config"
+            with patch.object(settings, "CONFIG_DIR", directory), patch.object(
+                    settings, "CONFIG_FILE", directory / "settings.json"):
+                def save(number):
+                    settings.save_settings("/tmp/drive", "conta-" + str(number),
+                                           auto_sync_enabled=bool(number % 2))
+                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as workers:
+                    list(workers.map(save, range(12)))
+                contents = json.loads(settings.CONFIG_FILE.read_text(encoding="utf-8"))
+                self.assertIn(contents["account"], {"conta-" + str(i) for i in range(12)})
+                self.assertEqual(settings.CONFIG_FILE.stat().st_mode & 0o777, 0o600)
+                self.assertFalse(list(directory.glob(".settings-*")))
 
     def test_corrupt_settings(self):
         with tempfile.TemporaryDirectory() as temp:
