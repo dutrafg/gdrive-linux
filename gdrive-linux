@@ -19,6 +19,7 @@ from mount_drive import command as mount_command, mount_path, MOUNT_ROOT
 from mount_health import mount_diagnosis, mount_ready, service_state, service_journal
 from mount_autostart import autostart_enabled, update_autostart
 from sync_filters import parse_entry, parse_rules
+from sync_profiles import MODES, validate_profiles
 from photos_export import upload_media
 from desktop_files import find_openable_file
 from deletion_review import load_candidates, archive_deletion
@@ -62,6 +63,9 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.auto_archive_deletions = self.preferences.get("auto_archive_deletions", False) is True
         self.sync_includes = self.preferences.get("sync_includes", [])
         self.sync_excludes = self.preferences.get("sync_excludes", [])
+        self.sync_mode = self.preferences.get("sync_mode", "bidirectional")
+        self.sync_profiles = self.preferences.get("sync_profiles", [])
+        self.profiles_configured = self.preferences.get("profiles_configured", False)
         self.search_mode = False
         self.folder = Path(self.preferences.get(
             "folder", str(Path.home() / "GoogleDrive"))).expanduser()
@@ -411,6 +415,12 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.exclude_entry.set_placeholder_text("Ex.: *.tmp, *.part, Cache/")
         self.exclude_entry.set_text(", ".join(self.sync_excludes))
         filters.append(self.exclude_entry)
+        filters.append(label("Direção da sincronização da conta selecionada:",
+                             "drive-muted", wrap=True))
+        self.sync_mode_dropdown = Gtk.DropDown.new_from_strings(
+            ["Bidirecional", "Somente enviar ao Drive", "Somente baixar da nuvem"])
+        self.sync_mode_dropdown.set_selected(MODES.index(self.sync_mode))
+        filters.append(self.sync_mode_dropdown)
         filters.append(action("Salvar regras de sincronização", self.save_sync_filters,
                               "document-save-symbolic", primary=True))
         filters.append(label("Exemplos: Documentos/ inclui arquivos nessa pasta; "
@@ -1045,7 +1055,9 @@ class DriveWindow(Gtk.ApplicationWindow):
             save_settings(self.folder, account, self.account_names,
                           self.auto_enabled, self.mount_read_only,
                           self.auto_archive_deletions,
-                          self.sync_includes, self.sync_excludes)
+                          self.sync_includes, self.sync_excludes,
+                          self.sync_mode, self.sync_profiles,
+                          self.profiles_configured)
             self.preferences["account"] = account
             self.preferences["folder"] = str(self.folder)
         except OSError as exc:
