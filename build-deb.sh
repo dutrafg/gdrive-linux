@@ -11,13 +11,14 @@ command -v dpkg-deb >/dev/null || { echo "Instale dpkg-deb para criar o pacote."
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 pkg="$work/pkg"
-mkdir -p "$pkg/DEBIAN" "$pkg/usr/bin" "$pkg/usr/share/gdrive-linux" "$pkg/usr/share/applications"
-for file in gdrive-linux rclone_backend.py settings.py progress.py google_oauth.py sync_plan.py safe_sync.py ui_kit.py style.css; do
+mkdir -p "$pkg/DEBIAN" "$pkg/usr/bin" "$pkg/usr/share/gdrive-linux" "$pkg/usr/share/applications" "$pkg/usr/lib/systemd/user"
+for file in gdrive-linux rclone_backend.py settings.py progress.py google_oauth.py sync_plan.py safe_sync.py ui_kit.py style.css background_sync.py; do
   test -f "$file" || { echo "Arquivo ausente: $file" >&2; exit 1; }
   cp "$file" "$pkg/usr/share/gdrive-linux/$file"
 done
 printf '%s\n' '#!/bin/sh' 'exec /usr/bin/python3 /usr/share/gdrive-linux/gdrive-linux "$@"' > "$pkg/usr/bin/gdrive-linux"
 chmod 755 "$pkg/usr/bin/gdrive-linux"
+cp gdrive-linux-sync.service gdrive-linux-sync.timer "$pkg/usr/lib/systemd/user/"
 cat > "$pkg/DEBIAN/control" <<EOF
 Package: gdrive-linux
 Version: $version
