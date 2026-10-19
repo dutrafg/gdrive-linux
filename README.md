@@ -1,13 +1,13 @@
 # Drive para Linux
 
-Cliente experimental **GTK4** para acessar o Google Drive no Linux usando **rclone**. Versão atual: **0.9.1 Alpha**. Não é um cliente oficial do Google.
+Cliente experimental **GTK4** para acessar o Google Drive no Linux usando **rclone**. Versão atual: **0.9.2 Alpha**. Não é um cliente oficial do Google.
 
 ## Funcionalidades
 
 - Interface GTK4 com páginas **Arquivos**, **Atividades** e **Contas**.
 - Seleção de contas configuradas no rclone, com atualização assíncrona sem bloquear a interface, e navegação por pastas remotas.
 - Upload e download manuais usando `rclone copy`.
-- Barra de progresso baseada nas estatísticas do rclone, logs, cancelamento e histórico **apenas da sessão**.
+- Barra de progresso baseada nas estatísticas do rclone, logs, estados de conclusão/falha/cancelamento e histórico **apenas da sessão**.
 - Pasta local configurável e preferências salvas em `~/.config/gdrive-linux/settings.json` (sem tokens OAuth).
 
 **Limitações:** não há sincronização automática/bidirecional, montagem virtual, autenticação integrada, atualização automática, histórico persistente ou integração nativa com gerenciador de arquivos. O aplicativo ainda precisa de validação funcional em diferentes distribuições.
@@ -22,7 +22,7 @@ sudo apt install python3 python3-gi gir1.2-gtk-4.0 rclone
 python3 gdrive-linux
 ```
 
-Para instalar o pacote `.deb`, baixe o artefato da execução aprovada em [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions) e instale com `sudo apt install ./gdrive-linux_0.9.1_all.deb`. O arquivo só estará disponível após o workflow gerar o artefato.
+Para instalar o pacote `.deb`, baixe o artefato da execução aprovada em [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions) e instale com `sudo apt install ./gdrive-linux_0.9.2_all.deb`. O arquivo só estará disponível após o workflow gerar o artefato.
 
 ## Configuração da conta
 
@@ -40,4 +40,4 @@ O workflow `.github/workflows/build-deb.yml` executa compilação sintática Pyt
 
 ## Versionamento
 
-Até **0.9.1**, versões Alpha. **1.0.0 Beta** será o marco de início da fase Beta, sujeito a QA; depois seguem versões incrementais. Consulte [SECURITY.md](SECURITY.md) para cuidados de autenticação, permissões e divulgação de vulnerabilidades.
+Até **0.9.2**, versões Alpha. **1.0.0 Beta** será o marco de início da fase Beta, sujeito a QA; depois seguem versões incrementais. Consulte [SECURITY.md](SECURITY.md) para cuidados de autenticação, permissões e divulgação de vulnerabilidades.
