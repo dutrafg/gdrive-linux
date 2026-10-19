@@ -23,8 +23,9 @@ def load_settings():
         result["auto_sync_enabled"] = data.get("auto_sync_enabled") is True
         result["mount_read_only"] = data.get("mount_read_only") is not False
         result["auto_archive_deletions"] = data.get("auto_archive_deletions") is True
-        result["sync_includes"] = data.get("sync_includes", [])
-        result["sync_excludes"] = data.get("sync_excludes", [])
+        from sync_filters import parse_rules
+        result["sync_includes"] = parse_rules(data.get("sync_includes", []))
+        result["sync_excludes"] = parse_rules(data.get("sync_excludes", []))
         return result
     except (OSError, ValueError, TypeError):
         return {}
