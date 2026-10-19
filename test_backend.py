@@ -78,7 +78,8 @@ class NonDestructiveAutoDownloadTests(unittest.TestCase):
             cmd = b.copy_command('drive', folder, 'download', skip_existing=True)
             self.assertIn('--ignore-existing', cmd)
 
-    def test_upload_cannot_skip_existing(self):
+    def test_manual_upload_can_preserve_existing_cloud_files(self):
         with tempfile.TemporaryDirectory() as folder:
-            with self.assertRaises(ValueError):
-                b.copy_command('drive', folder, 'upload', skip_existing=True)
+            command = b.copy_command('drive', folder, 'upload', skip_existing=True)
+            self.assertIn('--ignore-existing', command)
+            self.assertEqual(command[1], 'copy')
