@@ -39,6 +39,28 @@ class RecoveryTests(unittest.TestCase):
             self.assertEqual(found.read_text(encoding="utf-8"),"user newer")
             self.assertTrue(old.exists())
 
+    def test_recovery_location_is_outside_selected_documents_mirror(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            documents = home / "Documents"
+            documents.mkdir()
+            alternative = recovery_root(home, mirror_folder=documents)
+            self.assertTrue(str(alternative).startswith(str(home / ".local")))
+            self.assertFalse(alternative.is_relative_to(documents))
+
+    def test_recovery_rejects_custom_destination_inside_mirror(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            mirror = root / "mirror"
+            mirror.mkdir()
+            source = root / "archived.txt"
+            source.write_text("backup", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "destino está dentro"):
+                restore_local_backup(RecoveryItem(source, "file.txt", "archive"),
+                                     destination=mirror / "Recovered",
+                                     mirror_folder=mirror)
+            self.assertTrue(source.exists())
+
     def test_refuses_symlink_as_backup(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
