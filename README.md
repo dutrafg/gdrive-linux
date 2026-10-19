@@ -1,27 +1,27 @@
 # Drive para Linux
 
-Cliente desktop experimental **GTK4 + rclone** para Google Drive em Linux. **Versão 0.11.1 Alpha**. Projeto independente, não oficial do Google.
+Cliente desktop experimental **GTK4 + rclone** para Google Drive em Linux. **Versão 0.11.2 Alpha**. Projeto independente, não oficial do Google.
 
 ## Interface
 
 A navegação foi redesenhada para o estilo de aplicativo Linux corporativo: sidebar azul-escuro, conteúdo claro, cartões responsivos, botões que se reorganizam em janelas estreitas, foco visível para navegação por teclado, estados visuais e ícones do sistema.
 
 - **Início:** conta ativa, pasta local, situação da sincronização e última transferência (dados reais da sessão).
-- **Contas:** selecionar conta, iniciar o assistente Google, escolher, abrir ou criar a pasta local `~/GoogleDrive`.
+- **Contas:** selecionar uma conta e ver claramente o nome remoto ativo, atribuir um nome de identificação local (opcional), verificar o acesso remoto sem exibir credenciais, iniciar o assistente Google e escolher, abrir ou criar a pasta local `~/GoogleDrive`.
 - **Arquivos:** navegar pelas pastas remotas, voltar, atualizar e visualizar nome/tamanho.
-- **Sincronização:** atualização automática opcional a cada cinco minutos (somente downloads novos), prévia de arquivos exclusivos, conflitos visíveis e transferência seletiva não destrutiva de até 100 arquivos.
+- **Sincronização:** indicação distinta de agendamento e transferência realmente em andamento, além de atualização automática opcional a cada cinco minutos (somente downloads novos), prévia de arquivos exclusivos, conflitos visíveis e transferência seletiva não destrutiva de até 100 arquivos.
 - **Transferências:** progresso real do rclone, cancelamento de cópias manuais e registros.
 - **Histórico:** lista de operações somente da sessão.
 - **Configurações:** diagnóstico do rclone, configuração avançada e avisos de segurança.
 
-Nenhum percentual de uso da nuvem ou transferência fictícia é apresentado. A interface é construída com widgets GTK4; o rclone faz acesso remoto e cópias.
+A consulta de nomes/pastas não aparece como transferência em andamento. Os botões de transferência agora permanecem dentro dos respectivos cartões mesmo em janelas menores. Nenhum percentual de uso da nuvem ou transferência fictícia é apresentado. A interface é construída com widgets GTK4; o rclone faz acesso remoto e cópias.
 
 ## Instalação no Zorin OS, Ubuntu e Debian
 
-Baixe o artefato aprovado na página de [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions), extraia o ZIP e instale o `gdrive-linux_0.11.1_all.deb`:
+Baixe o artefato aprovado na página de [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions), extraia o ZIP e instale o `gdrive-linux_0.11.2_all.deb`:
 
 ```bash
-sudo apt install ./gdrive-linux_0.11.1_all.deb
+sudo apt install ./gdrive-linux_0.11.2_all.deb
 ```
 
 O pacote requer Python 3, PyGObject e GTK4. A dependência `rclone` é **recomendada**, para permitir que a interface seja instalada mesmo quando o Zorin não oferece esse pacote nas fontes configuradas. **Sem o rclone, conexão e transferência não funcionam.** Confirme com `rclone version`; instruções oficiais: https://rclone.org/install/ .
@@ -55,4 +55,10 @@ O smoke GTK4 não equivale a avaliação visual humana nem a autenticação Goog
 
 ## Versionamento
 
-Até a v0.11.1, o aplicativo permanece **Alpha**. A promoção para uma versão pré-estável ou Beta depende de QA, especialmente autenticação com conta Google, compatibilidade em Zorin OS e confiabilidade de cópias.
+Até a v0.11.2, o aplicativo permanece **Alpha**. A promoção para uma versão pré-estável ou Beta depende de QA, especialmente autenticação com conta Google, compatibilidade em Zorin OS e confiabilidade de cópias.
+
+## Identificação da conta no Zorin OS
+
+A lista de contas do rclone apresenta nomes remotos como `meu_drive`; esse nome não é necessariamente o endereço Gmail. Em **Contas**, veja **Conta selecionada**, escolha um nome/e-mail de referência local opcional e clique em **Salvar identificação**. O texto será armazenado nas preferências locais, mas **não constitui verificação da identidade Google**. Para verificar se o acesso está operacional, use **Verificar acesso à conta**; a aplicação testa a conexão com o rclone sem mostrar credenciais.
+
+O botão **Simular** consulta inventários sem transferir dados. **Atualização automática ativada** significa agendamento de verificações a cada 5 minutos enquanto o aplicativo está aberto, e não que exista um download em curso naquele momento.
