@@ -9,7 +9,7 @@ REMOTE_RE = re.compile(r'^[^:\r\n/\\]+$')
 def remote_path(name, relative=''):
     if not REMOTE_RE.fullmatch(name) or name in ('.', '..'):
         raise ValueError('Nome de conta inválido')
-    if not isinstance(relative, str) or '\\' in relative or '\\x00' in relative or relative.startswith('/') or '..' in Path(relative).parts:
+    if not isinstance(relative, str) or '\\' in relative or '\x00' in relative or relative.startswith('/') or '..' in Path(relative).parts:
         raise ValueError('Caminho remoto inválido')
     return name + ':' + relative
 
