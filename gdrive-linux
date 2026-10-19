@@ -12,7 +12,7 @@ from settings import load_settings, save_settings
 from progress import parse_progress
 from google_oauth import google_config_command
 
-VERSION = "0.9.7"
+VERSION = "0.9.8"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -91,7 +91,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.auto_switch.connect("notify::active", self.auto_changed)
         auto_row.append(Gtk.Label(label="Atualizar da nuvem automaticamente (5 min)"))
         auto_row.append(self.auto_switch)
-        note = Gtk.Label(label="Somente download; pode sobrescrever arquivos locais.")
+        note = Gtk.Label(label="Somente download; arquivos locais existentes não serão sobrescritos.")
         note.set_wrap(True)
         note.set_xalign(0)
         accounts_page.append(note)
@@ -402,7 +402,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             return
         local = str(self.folder)
         try:
-            command = copy_command(self.remotes.get_string(index), local, direction, preserve_newer=automatic)
+            command = copy_command(self.remotes.get_string(index), local, direction, skip_existing=automatic)
         except ValueError as exc:
             self.status.set_text(str(exc))
             return
