@@ -6,12 +6,12 @@ from datetime import datetime
 from pathlib import Path
 import gi
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk, GLib, Gio
 from rclone_backend import list_remotes, copy_command, list_files
 from settings import load_settings, save_settings
 from progress import parse_progress
 
-VERSION = "0.9.4"
+VERSION = "0.9.5"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -25,6 +25,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.cancel_requested = False
         self.progress_known = False
         self.transfer_generation = 0
+        self.auto_enabled = False
+        self.auto_interval_seconds = 300
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         root.set_margin_top(20)
         root.set_margin_bottom(20)
@@ -75,6 +77,19 @@ class DriveWindow(Gtk.ApplicationWindow):
         choose = Gtk.Button(label="Escolher…")
         choose.connect("clicked", self.choose_folder)
         folderrow.append(choose)
+        open_folder = Gtk.Button(label="Abrir no gerenciador")
+        open_folder.connect("clicked", self.open_local_folder)
+        accounts_page.append(open_folder)
+        auto_row = Gtk.Box(spacing=8)
+        accounts_page.append(auto_row)
+        self.auto_switch = Gtk.Switch()
+        self.auto_switch.connect("notify::active", self.auto_changed)
+        auto_row.append(Gtk.Label(label="Atualizar da nuvem automaticamente (5 min)"))
+        auto_row.append(self.auto_switch)
+        note = Gtk.Label(label="Somente download; pode sobrescrever arquivos locais.")
+        note.set_wrap(True)
+        note.set_xalign(0)
+        accounts_page.append(note)
 
         actions = Gtk.Box(spacing=8)
         accounts_page.append(actions)
@@ -247,6 +262,30 @@ class DriveWindow(Gtk.ApplicationWindow):
             d.destroy()
         dialog.connect("response", response)
         dialog.show()
+
+    def open_local_folder(self, *_):
+        try:
+            if not self.folder.is_dir():
+                self.status.set_text("Escolha uma pasta local existente.")
+                return
+            Gio.AppInfo.launch_default_for_uri(self.folder.resolve().as_uri(), None)
+        except (GLib.Error, OSError) as exc:
+            self.status.set_text("Falha ao abrir pasta: " + str(exc))
+
+    def auto_changed(self, switch, *_):
+        self.auto_enabled = switch.get_active()
+        if self.auto_enabled:
+            self.status.set_text("Atualização automática ativa nesta sessão.")
+            GLib.timeout_add_seconds(self.auto_interval_seconds, self.auto_tick)
+        else:
+            self.status.set_text("Atualização automática desativada.")
+
+    def auto_tick(self):
+        if not self.auto_enabled:
+            return False
+        if not self.busy and self.selected_remote() and self.folder.is_dir():
+            self.transfer(None, "download")
+        return True
 
     def configure(self, *_):
         try:
