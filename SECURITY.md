@@ -1,6 +1,6 @@
 # Política de segurança — Drive para Linux
 
-**Estado:** 0.12.0 Alpha, software experimental. Não há auditoria de segurança independente nem garantia de uso em produção.
+**Estado:** 0.13.0 Alpha, software experimental. Não há auditoria de segurança independente nem garantia de uso em produção.
 
 ## Reportar vulnerabilidades
 
@@ -42,7 +42,7 @@ Informe versão, distribuição Linux, passos de reprodução, impacto e registr
 
 Use uma conta e pasta de testes, confirme origem e destino, mantenha backup separado e examine o resultado antes de repetir uma operação. Relate qualquer sobrescrita inesperada ou problema de autorização pelo canal privado de segurança.
 
-## Serviço de sincronização contínua (v0.12.0)
+## Serviço de sincronização contínua (v0.13.0)
 
 - A ativação exige selecionar uma conta remota e uma pasta local existentes. O botão da interface ativa um `systemd --user` timer; o daemon confere a preferência salva e retorna sem fazer nada se desativado.
 - O daemon usa bloqueio exclusivo para impedir execuções simultâneas **do próprio serviço**. Transferências manuais iniciadas separadamente ainda exigem cuidado: evite usar os botões manuais enquanto a rotina automática estiver ativa.
@@ -50,3 +50,12 @@ Use uma conta e pasta de testes, confirme origem e destino, mantenha backup sepa
 - Mudanças concorrentes durante uma transferência, interrupções inesperadas, arquivos Google Docs sem MD5 comparável ou falta de espaço são limitações conhecidas. O serviço não fornece uma garantia transacional de integridade nem substitui um backup independente.
 - A integração usa comandos rclone com lista de argumentos, sem senha ou tokens na linha de comando. Nenhum arquivo é intencionalmente excluído do Drive por este sincronizador.
 - As funcionalidades nativas exclusivas do cliente Google para Windows (presença colaborativa no Microsoft Office, Google Photos, streaming/FUSE, etc.) não são equivalentes às funções do rclone; não alegar paridade completa.
+
+## Disco virtual, integração com aplicativos e Google Fotos
+
+- O modo streaming usa `rclone mount` e FUSE, em pasta **separada** do espelhamento. O modo padrão é somente leitura. Um usuário pode ativar gravação experimental, que usa cache e depende da rede; dados ainda não descarregados podem ocupar espaço e requerer recuperação após falha de conexão. Evite edições simultâneas.
+- O serviço de montagem `systemd --user` não recebe permissões administrativas nem tokens via linha de comando. O helper `fusermount3` requer permissões apropriadas do sistema, portanto o serviço não utiliza `NoNewPrivileges=true` que impediria o helper; execute apenas com usuário normal.
+- A abertura de documentos usa o aplicativo padrão registrado pelo Linux. Não se implementou integração proprietária Microsoft Office/Outlook, proteção colaborativa em tempo real nem bloqueios distribuídos.
+- O Google Fotos usa um backend independente do rclone e faz envio **manual** sem exclusão. Credenciais próprias devem ser configuradas pelo assistente seguro do rclone; não cole client secrets na GUI, nos logs ou em argumentos de linha de comando. O Photos API não fornece acesso irrestrito para download histórico.
+- Exclusões do espelhamento não são executadas automaticamente. A revisão exige seleção e confirmação dupla, usa bloqueio exclusivo do sincronizador e verifica o hash da cópia remanescente em relação ao histórico antes de arquivá-la em local recuperável. Ela não equivale a uma lixeira do Google oficial e não substitui backups.
+- Funcionalidades de montagem FUSE e upload para uma conta Google Photos real ainda dependem de homologação em um Zorin OS real e de credenciais válidas; os testes automatizados só verificam a construção segura dos comandos e fluxos locais.
