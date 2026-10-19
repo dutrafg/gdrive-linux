@@ -6,8 +6,9 @@ from pathlib import Path
 import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, GLib
+from rclone_backend import list_remotes, copy_command
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -106,9 +107,7 @@ class DriveWindow(Gtk.ApplicationWindow):
 
     def refresh(self, *_):
         try:
-            result = subprocess.run(["rclone", "listremotes"], capture_output=True,
-                                    text=True, timeout=15, check=True)
-            names = [line.strip().removesuffix(":") for line in result.stdout.splitlines() if line.strip()]
+            names = list_remotes()
             self.remotes.splice(0, self.remotes.get_n_items(), names)
             if names:
                 self.dropdown.set_selected(0)
@@ -132,17 +131,22 @@ class DriveWindow(Gtk.ApplicationWindow):
         remote = self.remotes.get_string(index) + ":"
         local = str(self.folder)
         src, dst = (remote, local) if direction == "download" else (local, remote)
+        try:
+            command = copy_command(self.remotes.get_string(index), local, direction)
+        except ValueError as exc:
+            self.status.set_text(str(exc))
+            return
         self.busy = True
         self.download.set_sensitive(False)
         self.upload.set_sensitive(False)
         self.cancel_button.set_sensitive(True)
         self.status.set_text("Transferência em andamento…")
-        threading.Thread(target=self.worker, args=(src, dst), daemon=True).start()
+        threading.Thread(target=self.worker, args=(command,), daemon=True).start()
 
-    def worker(self, src, dst):
+    def worker(self, command):
         try:
             self.proc = subprocess.Popen(
-                ["rclone", "copy", src, dst, "--stats", "5s", "--log-level", "INFO"],
+                command,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
             for line in self.proc.stdout:
                 GLib.idle_add(self.append, line.rstrip())
