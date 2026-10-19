@@ -91,6 +91,10 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.update_background_status()
         self.refresh_mount_startup()
         self.refresh()
+        # Background service is independent of the GTK window. While this
+        # window is open, periodically read its persisted status without
+        # issuing Google API requests or starting additional copy jobs.
+        GLib.timeout_add_seconds(60, self.refresh_service_indicators)
         if self.auto_enabled:
             # Reconcile the persisted opt-in with the actual Linux timer on startup.
             threading.Thread(target=self.background_toggle_worker,
@@ -1941,6 +1945,12 @@ class DriveWindow(Gtk.ApplicationWindow):
                     if success else "O serviço não concluiu a sincronização. Verifique o status.",
                     "success" if success else "warning")
         return False
+
+    def refresh_service_indicators(self):
+        self.update_background_status()
+        if self.pages.get_visible_child_name() == "mount":
+            self.refresh_mount_status()
+        return True
 
     def update_background_status(self, *_):
         status = read_json(STATE_BASE / "latest.json")
