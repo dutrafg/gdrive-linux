@@ -81,6 +81,18 @@ class TrayTests(unittest.TestCase):
         self.assertNotIn("private-work", label)
         self.assertFalse(attention)
 
+    def test_partial_queue_is_not_displayed_as_synced(self):
+        message, alarm = status_summary({"state": "partial", "pending": 27})
+        self.assertIn("27", message)
+        self.assertNotIn("Sincronizado", message)
+        self.assertFalse(alarm)
+
+    def test_one_way_success_shows_intentionally_excluded_items(self):
+        message, alarm = status_summary({
+            "state": "ok", "pending": 0, "skipped_direction": 4})
+        self.assertIn("4", message)
+        self.assertFalse(alarm)
+
     def test_per_user_autostart(self):
         with tempfile.TemporaryDirectory() as root:
             base = Path(root)
