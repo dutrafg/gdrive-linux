@@ -19,6 +19,7 @@ from rclone_backend import list_remotes, remote_path
 from settings import load_settings
 from sync_plan import local_inventory, remote_inventory, validate_relative
 from sync_filters import filtered_inventory, parse_rules
+from sync_profiles import effective_profiles, get_profile_mode
 from rclone_errors import (rclone_limits, is_rate_limit, friendly,
                            cooldown_active, quota_retry_after)
 
@@ -197,6 +198,7 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
     config = load_settings() if config is None else config
     if not config.get("auto_sync_enabled", False):
         return {"state": "disabled", "copied": 0, "conflicts": 0}
+    mode = get_profile_mode(config)
     includes = parse_rules(config.get("sync_includes", []))
     excludes = parse_rules(config.get("sync_excludes", []))
     remote = config.get("account")
@@ -214,23 +216,31 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
         raise ValueError("A pasta escolhida está indisponível; nenhuma ação executada")
     if remote not in list_remotes():
         raise ValueError("Conta rclone não disponível")
-    latest_status = read_json(state_base / "latest.json")
-    if cooldown_active(latest_status):
-        return latest_status
     state_base.mkdir(parents=True, mode=0o700, exist_ok=True)
     os.chmod(state_base, 0o700)
     key = job_key(remote, folder)
+    latest_path = state_base / (key + "-latest.json")
+    latest_status = read_json(latest_path)
+    if cooldown_active(latest_status):
+        return latest_status
     with (state_base / (key + ".lock")).open("a+") as lock:
         try:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return {"state": "busy", "copied": 0, "conflicts": 0}
         snapshot_path = state_base / (key + ".json")
-        baseline = read_json(snapshot_path).get("md5", {})
-        if not isinstance(baseline, dict):
+        full_baseline = read_json(snapshot_path).get("md5", {})
+        if not isinstance(full_baseline, dict):
             raise ValueError("Estado da sincronização inválido")
+        baseline = filtered_inventory(full_baseline, includes, excludes)
+        excluded_baseline = {p: digest for p, digest in full_baseline.items()
+                             if p not in baseline}
         local, cloud = inventories(remote, folder, includes, excludes)
         actions, conflicts = build_plan(local, cloud, baseline)
+        if mode == "upload":
+            actions = [item for item in actions if item[0].startswith("upload")]
+        elif mode == "download":
+            actions = [item for item in actions if item[0].startswith("download")]
         if dry_run:
             return {"state": "preview", "copied": 0,
                     "conflicts": len(conflicts), "pending": len(actions)}
@@ -242,7 +252,7 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
         archived = []
         run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
         try:
-            if config.get("auto_archive_deletions") is True:
+            if mode == "bidirectional" and config.get("auto_archive_deletions") is True:
                 archived = archive_unilateral_deletions(remote, folder, local, cloud,
                                                        baseline, run_id, backup_base)
                 for relative in archived:
@@ -257,12 +267,16 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
             # Keep track of copies actually verified even if a later copy fails.
             local_after, cloud_after = inventories(remote, folder, includes, excludes)
             new_base = refresh_baseline(baseline, local_after, cloud_after)
-            save_private_json(snapshot_path, {"md5": new_base})
+            save_private_json(snapshot_path, {"md5": dict(excluded_baseline, **new_base)})
         status = {"state": "ok" if not conflicts else "conflicts",
                   "copied": copied, "archived": len(archived),
                   "conflicts": len(conflicts),
                   "pending": max(0, planned_count - copied),
                   "time": datetime.now(timezone.utc).isoformat()}
+        status["account"] = remote
+        status["folder"] = str(folder)
+        status["mode"] = mode
+        save_private_json(latest_path, status)
         save_private_json(state_base / "latest.json", status)
         return status
 
