@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 
 from settings import load_settings
+from rclone_errors import rclone_limits
 
 SAFE_REMOTE = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,79}$")
 MOUNT_ROOT = Path.home() / "DriveOnline"
@@ -48,7 +49,8 @@ def command(config, root=MOUNT_ROOT, require_tools=False, create=False):
     read_only = config.get("mount_read_only", True) is not False
     argv = ["rclone", "mount", remote + ":", str(mount),
             "--vfs-cache-mode", "full", "--vfs-cache-max-size", "2G",
-            "--dir-cache-time", "5m", "--poll-interval", "1m"]
+            "--dir-cache-time", "5m", "--poll-interval", "1m",
+            "--vfs-write-back", "10s", "--transfers", "1"] + rclone_limits()
     if read_only:
         argv.append("--read-only")
     return argv
