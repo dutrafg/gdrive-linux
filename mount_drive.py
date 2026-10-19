@@ -15,7 +15,12 @@ MOUNT_ROOT = Path.home() / "DriveOnline"
 def mount_path(remote, root=MOUNT_ROOT):
     if not isinstance(remote, str) or not SAFE_REMOTE.fullmatch(remote):
         raise ValueError("Nome de conta não aceito para montagem; renomeie no rclone.")
-    base = Path(root).expanduser().resolve()
+    chosen = Path(root).expanduser()
+    if chosen.is_symlink():
+        raise ValueError("A pasta raiz do disco virtual não pode ser um link simbólico.")
+    base = chosen.resolve()
+    if chosen.exists() and not chosen.is_dir():
+        raise ValueError("A raiz da montagem do Drive não é uma pasta.")
     return base / remote
 
 def validate_mount(config, root=MOUNT_ROOT, require_tools=True, create=False):
@@ -42,8 +47,11 @@ def validate_mount(config, root=MOUNT_ROOT, require_tools=True, create=False):
             raise RuntimeError("rclone não encontrado no PATH do serviço. Verifique /usr/bin/rclone ou /usr/local/bin/rclone.")
         if not shutil.which("fusermount3") and not shutil.which("fusermount"):
             raise RuntimeError("Instale o pacote fuse3 e habilite /dev/fuse.")
-        if not Path("/dev/fuse").exists():
+        device = Path("/dev/fuse")
+        if not device.exists():
             raise RuntimeError("FUSE indisponível neste Linux (/dev/fuse ausente).")
+        if not os.access(device, os.R_OK | os.W_OK):
+            raise RuntimeError("O usuário não consegue acessar /dev/fuse para leitura e escrita.")
     if create:
         mount.mkdir(parents=True, exist_ok=True, mode=0o700)
         if not os.path.ismount(mount) and any(mount.iterdir()):
