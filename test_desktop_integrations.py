@@ -5,7 +5,7 @@ from unittest.mock import patch
 from filemanager_bookmarks import set_bookmark, bookmark_entry
 from google_docs_export import export_command, export_folder, assert_not_inside_mirror, export_documents
 from tray_indicator import status_summary
-from tray_autostart import set_indicator_autostart, indicator_enabled
+from tray_autostart import set_indicator_autostart, indicator_enabled, indicator_available
 from mount_autostart import update_autostart
 
 class FileManagerTests(unittest.TestCase):
@@ -63,6 +63,23 @@ class TrayTests(unittest.TestCase):
         self.assertIn("Sincronizado", status_summary({"state":"ok","pending":0})[0])
         self.assertTrue(status_summary({"state":"quota"})[1])
         self.assertTrue(status_summary({"state":"conflicts"})[1])
+
+    def test_independent_gtk3_indicator_probe(self):
+        calls = []
+        def runner(argv, **kwargs):
+            calls.append(argv)
+            return type("Result", (), {"returncode": 0})()
+        self.assertTrue(indicator_available(runner=runner))
+        self.assertEqual(calls[0][:2], ["/usr/bin/python3", "-c"])
+        self.assertIn("AyatanaAppIndicator3", calls[0][2])
+
+    def test_multi_account_status_has_no_remote_names(self):
+        label, attention = status_summary({
+            "state": "ok", "pending": 1,
+            "profiles": [{"account": "private-work"}, {"account": "private-home"}]})
+        self.assertIn("2 conta", label)
+        self.assertNotIn("private-work", label)
+        self.assertFalse(attention)
 
     def test_per_user_autostart(self):
         with tempfile.TemporaryDirectory() as root:
