@@ -16,6 +16,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-gi gir1.2-gtk-4.0 weston dbus-x11 rclone
+          /usr/bin/python3 -m unittest -v test_ui_kit
       - name: Offline rclone transfer integration tests
         run: /usr/bin/python3 -m unittest -v test_integration
       - name: GTK4 native Wayland startup smoke test
