@@ -65,6 +65,13 @@ def command(config, root=MOUNT_ROOT, require_tools=False, create=False):
             "--vfs-cache-mode", "writes", "--vfs-cache-max-size", "2G",
             "--dir-cache-time", "15m", "--poll-interval", "5m",
             "--vfs-write-back", "10s", "--transfers", "1"] + rclone_limits()
+    # systemd may start without interactive shell environment; a deterministic
+    # per-user cache avoids different VFS writeback locations across logins.
+    cache = Path.home() / ".cache" / "gdrive-linux" / "rclone"
+    argv.extend(["--cache-dir", str(cache)])
+    default_config = Path.home() / ".config" / "rclone" / "rclone.conf"
+    if default_config.is_file():
+        argv.extend(["--config", str(default_config)])
     if read_only:
         argv.append("--read-only")
     return argv
