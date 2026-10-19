@@ -59,8 +59,12 @@ class MountTests(unittest.TestCase):
     def test_preflight_detects_inaccessible_fuse_device(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "DriveOnline"
+            root.mkdir()
+            original_exists = Path.exists
             with (patch("mount_drive.shutil.which", return_value="/usr/bin/rclone"),
-                  patch("mount_drive.Path.exists", return_value=True),
+                  patch("mount_drive.Path.exists", autospec=True,
+                        side_effect=lambda path: (str(path) == "/dev/fuse" or
+                                                 original_exists(path))),
                   patch("mount_drive.os.access", return_value=False)):
                 with self.assertRaisesRegex(RuntimeError, "não consegue acessar"):
                     validate_mount({"account": "personal",
