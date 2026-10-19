@@ -38,5 +38,5 @@ def copy_command(remote, local_folder, direction):
         raise ValueError('Pasta local não existe')
     cloud = remote_path(remote)
     source, dest = (str(local), cloud) if direction == 'upload' else (cloud, str(local))
-    return ['rclone', 'copy', source, dest, '--stats', '5s', '--log-level', 'INFO',
+    return ['rclone', 'copy', source, dest, '--stats', '1s', '--stats-one-line', '--stats-log-level', 'NOTICE', '--log-level', 'NOTICE',
             '--retries', '3', '--low-level-retries', '5']
