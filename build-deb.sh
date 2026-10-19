@@ -12,7 +12,7 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 pkg="$work/pkg"
 mkdir -p "$pkg/DEBIAN" "$pkg/usr/bin" "$pkg/usr/share/gdrive-linux" "$pkg/usr/share/applications" "$pkg/usr/lib/systemd/user"
-for file in gdrive-linux rclone_backend.py settings.py progress.py google_oauth.py sync_plan.py safe_sync.py ui_kit.py style.css background_sync.py mount_drive.py photos_export.py desktop_files.py deletion_review.py; do
+for file in gdrive-linux rclone_backend.py settings.py progress.py google_oauth.py sync_plan.py safe_sync.py ui_kit.py style.css background_sync.py mount_drive.py photos_export.py desktop_files.py deletion_review.py diagnostics.py; do
   test -f "$file" || { echo "Arquivo ausente: $file" >&2; exit 1; }
   cp "$file" "$pkg/usr/share/gdrive-linux/$file"
 done
