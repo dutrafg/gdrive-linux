@@ -129,8 +129,8 @@ jobs:
           test "$(dpkg-query -W -f='${Version}' gdrive-linux)" = "0.14.1"
           test -x /usr/bin/gdrive-linux
           dpkg-deb -f gdrive-linux_0.14.1_all.deb Depends | grep -q 'gir1.2-gtk-4.0'
-          ! dpkg-deb -f gdrive-linux_0.14.1_all.deb Depends | grep -q 'rclone'
-          dpkg-deb -f gdrive-linux_0.14.1_all.deb Recommends | grep -q 'rclone'
+          dpkg-deb -f gdrive-linux_0.14.1_all.deb Depends | grep -q 'rclone'
+          dpkg-deb -f gdrive-linux_0.14.1_all.deb Depends | grep -q 'fuse3'
           test -f /usr/share/gdrive-linux/gdrive-linux
           test -f /usr/share/gdrive-linux/style.css
           test -f /usr/share/gdrive-linux/ui_kit.py
