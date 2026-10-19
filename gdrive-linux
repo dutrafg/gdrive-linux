@@ -363,6 +363,13 @@ class DriveWindow(Gtk.ApplicationWindow):
         settings_page.append(privacy)
         self.pages.add_titled(settings_page, "settings", "Configurações")
 
+    def notice(self, message, tone=None):
+        self.status.set_text(message)
+        for css in ("drive-status-success", "drive-status-error", "drive-status-warning"):
+            self.status.remove_css_class(css)
+        if tone in ("success", "error", "warning"):
+            self.status.add_css_class("drive-status-" + tone)
+
     def restore_account(self):
         account = self.preferences.get("account", "")
         for index in range(self.remotes.get_n_items()):
@@ -468,7 +475,9 @@ class DriveWindow(Gtk.ApplicationWindow):
                 if file and file.get_path():
                     self.folder = Path(file.get_path())
                     self.folder_label.set_text(str(self.folder))
+                    self.home_folder.set_text(str(self.folder))
                     self.persist()
+                    self.notice("Pasta selecionada: " + str(self.folder), "success")
             d.destroy()
         dialog.connect("response", response)
         dialog.show()
@@ -754,6 +763,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.current_history = Gtk.Label(label=direction_name + (" automático" if automatic else "") + " • Em andamento")
         self.current_history.set_xalign(0)
         self.history.prepend(self.current_history)
+        self.history_empty.set_visible(False)
+        self.home_activity.set_text(direction_name + " em andamento…")
         self.proc = None
         self.cancel_requested = False
         self.download.set_sensitive(False)
@@ -764,7 +775,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.progress_known = False
         self.progress.set_text("Transferindo…")
         if not automatic:
-            self.pages.set_visible_child_name("activity")
+            self.navigate("activity")
         self.progress.pulse()
         self.progress_timer = GLib.timeout_add(250, self.pulse_progress)
         threading.Thread(target=self.worker, args=(command, generation), daemon=True).start()
@@ -819,7 +830,9 @@ class DriveWindow(Gtk.ApplicationWindow):
         if generation != self.transfer_generation:
             return False
         self.proc = None
-        self.status.set_text(result)
+        self.notice(result, "success" if result == "Transferência concluída." else
+                    "warning" if result == "Transferência cancelada." else "error")
+        self.home_activity.set_text(result)
         if self.current_history is not None:
             self.current_history.set_text(datetime.now().strftime("%d/%m %H:%M") + " • " + result)
             self.current_history = None
