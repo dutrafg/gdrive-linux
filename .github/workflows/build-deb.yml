@@ -50,6 +50,11 @@ jobs:
             cat /tmp/weston-gdrive.log
             exit 1
           fi
+          dbus-run-session -- /usr/bin/python3 gdrive-linux --ui-smoke > /tmp/gdrive-ui-smoke.log 2>&1 || {
+            cat /tmp/gdrive-ui-smoke.log
+            exit 1
+          }
+          cat /tmp/gdrive-ui-smoke.log
           if grep -Eq "Traceback|NameError|TypeError|AttributeError|Gtk-ERROR|Gdk-ERROR" /tmp/gdrive-smoke.log; then
             echo "GTK4 Wayland smoke test detected an error"
             exit 1
