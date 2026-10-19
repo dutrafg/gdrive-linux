@@ -6,9 +6,12 @@ gir1.2-ayatanaappindicator3-0.1 (or compatible AppIndicator3).
 import subprocess
 from pathlib import Path
 from background_sync import read_json, STATE_BASE
+from sync_display import last_activity_age
 
 def status_summary(status):
     state = status.get("state", "unknown") if isinstance(status, dict) else "unknown"
+    if state in ("ok", "partial", "busy") and last_activity_age(status):
+        return "Sem atualização recente; verifique o timer de sincronização", True
     if state == "ok":
         accounts = status.get("profiles")
         count = len(accounts) if isinstance(accounts, list) else 0
