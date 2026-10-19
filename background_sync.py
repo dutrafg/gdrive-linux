@@ -18,6 +18,8 @@ from pathlib import Path
 from rclone_backend import list_remotes, remote_path
 from settings import load_settings
 from sync_plan import local_inventory, remote_inventory, validate_relative
+from rclone_errors import (rclone_limits, is_rate_limit, friendly,
+                           cooldown_active, quota_retry_after)
 
 STATE_BASE = Path.home() / ".local" / "state" / "gdrive-linux"
 BACKUP_BASE = Path.home() / ".local" / "share" / "gdrive-linux" / "backups"
@@ -115,7 +117,8 @@ def transfer_one(remote, folder, operation, relative, run_id, backup_base=BACKUP
     if not uploading and operation.endswith("new") and (target.exists() or target.is_symlink()):
         raise ValueError("Destino local já existe")
     src, dst = (str(target), cloud) if uploading else (cloud, str(target))
-    command = ["rclone", "copyto", src, dst, "--retries", "2"]
+    command = ["rclone", "copyto", src, dst, "--retries", "2",
+               "--transfers", "1", "--checkers", "1"] + rclone_limits()
     if operation.endswith("new"):
         command.append("--ignore-existing")
     else:
@@ -126,9 +129,11 @@ def transfer_one(remote, folder, operation, relative, run_id, backup_base=BACKUP
             Path(backup).mkdir(parents=True, mode=0o700, exist_ok=True)
         command.extend(["--backup-dir", backup])
     result = subprocess.run(command, stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL, timeout=900)
+                            stderr=subprocess.PIPE, text=True, timeout=900)
     if result.returncode:
-        raise RuntimeError("Falha ao copiar arquivo: " + relative)
+        if is_rate_limit(result.stderr):
+            raise RuntimeError(friendly(result.stderr))
+        raise RuntimeError("Falha de acesso ou escrita durante a transferência: " + relative)
 
 def refresh_baseline(previous, local, cloud):
     """Commit only verified identical pairs; keep older baseline for conflicts."""
@@ -161,6 +166,9 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
         raise ValueError("A pasta escolhida está indisponível; nenhuma ação executada")
     if remote not in list_remotes():
         raise ValueError("Conta rclone não disponível")
+    latest_status = read_json(state_base / "latest.json")
+    if cooldown_active(latest_status):
+        return latest_status
     state_base.mkdir(parents=True, mode=0o700, exist_ok=True)
     os.chmod(state_base, 0o700)
     key = job_key(remote, folder)
@@ -178,8 +186,9 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
         if dry_run:
             return {"state": "preview", "copied": 0,
                     "conflicts": len(conflicts), "pending": len(actions)}
+        planned_count = len(actions)
         if len(actions) > max_files:
-            # Bounded batch, so frequent scans never overload Google Drive.
+            # Gradual batches; never require manually reducing the batch.
             actions = actions[:max_files]
         copied = 0
         run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
@@ -196,7 +205,7 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
             save_private_json(snapshot_path, {"md5": new_base})
         status = {"state": "ok" if not conflicts else "conflicts",
                   "copied": copied, "conflicts": len(conflicts),
-                  "pending": max(0, len(actions) - copied),
+                  "pending": max(0, planned_count - copied),
                   "time": datetime.now(timezone.utc).isoformat()}
         save_private_json(state_base / "latest.json", status)
         return status
@@ -204,7 +213,7 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
 def notify_if_changed(previous, current):
     """Desktop notification only when a new error/conflict condition appears."""
     state = current.get("state")
-    if state not in ("conflicts", "error"):
+    if state not in ("conflicts", "error", "quota"):
         return False
     if previous.get("state") == state and (
         state == "error" or previous.get("conflicts") == current.get("conflicts")):
@@ -213,6 +222,7 @@ def notify_if_changed(previous, current):
         return False
     message = ("Conflitos pendentes; verifique o Drive para Linux."
                if state == "conflicts" else
+               "API do Google temporariamente limitada. Confira Client ID próprio no rclone." if state == "quota" else
                "Falha de sincronização. Verifique a conta e a pasta local.")
     try:
         subprocess.run(["notify-send", "--app-name=Drive para Linux",
@@ -233,8 +243,13 @@ def main():
     try:
         status = run_once(dry_run=args.dry_run)
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
-        status = {"state": "error", "message": str(exc),
+        raw = str(exc) + " " + str(getattr(exc, "stderr", "") or "")
+        quota = is_rate_limit(raw)
+        status = {"state": "quota" if quota else "error",
+                  "message": friendly(raw) if quota else str(exc)[:400],
                   "time": datetime.now(timezone.utc).isoformat()}
+        if quota:
+            status["retry_after"] = quota_retry_after()
         save_private_json(STATE_BASE / "latest.json", status)
         notify_if_changed(previous, status)
         print("Drive para Linux: verificação interrompida.", file=sys.stderr)
