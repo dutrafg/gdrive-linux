@@ -20,7 +20,7 @@ VERSION = "0.11.1"
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title="Drive para Linux")
-        self.set_default_size(1080, 740)
+        self.set_default_size(1040, 680)
         self.set_size_request(720, 520)
         self.proc = None
         self.busy = False
