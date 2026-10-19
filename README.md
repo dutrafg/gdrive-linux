@@ -1,6 +1,6 @@
 # Drive para Linux
 
-Cliente experimental **GTK4** para acessar o Google Drive no Linux usando **rclone**. Versão atual: **0.9.6 Alpha**. Não é um cliente oficial do Google.
+Cliente experimental **GTK4** para acessar o Google Drive no Linux usando **rclone**. Versão atual: **0.9.7 Alpha**. Não é um cliente oficial do Google.
 
 ## Funcionalidades
 
@@ -12,7 +12,7 @@ Cliente experimental **GTK4** para acessar o Google Drive no Linux usando **rclo
 - Barra de progresso baseada nas estatísticas do rclone, logs, estados de conclusão/falha/cancelamento e histórico **apenas da sessão**.
 - Pasta local configurável e preferências salvas em `~/.config/gdrive-linux/settings.json` (sem tokens OAuth).
 
-**Limitações:** não há sincronização bidirecional, sincronização em segundo plano com o aplicativo fechado, montagem virtual, autenticação OAuth integrada, atualização automática, histórico persistente ou integração nativa com gerenciador de arquivos. O aplicativo ainda precisa de validação funcional em diferentes distribuições.
+**Limitações:** não há sincronização bidirecional, sincronização em segundo plano com o aplicativo fechado, montagem virtual, autenticação OAuth sem navegador externo, atualização automática, histórico persistente ou integração nativa com gerenciador de arquivos. O aplicativo ainda precisa de validação funcional em diferentes distribuições.
 
 ## Instalação e execução
 
@@ -24,11 +24,11 @@ sudo apt install python3 python3-gi gir1.2-gtk-4.0 rclone
 python3 gdrive-linux
 ```
 
-Para instalar o pacote `.deb`, baixe o artefato da execução aprovada em [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions) e instale com `sudo apt install ./gdrive-linux_0.9.6_all.deb`. O arquivo só estará disponível após o workflow gerar o artefato.
+Para instalar o pacote `.deb`, baixe o artefato da execução aprovada em [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions) e instale com `sudo apt install ./gdrive-linux_0.9.7_all.deb`. O arquivo só estará disponível após o workflow gerar o artefato.
 
 ## Configuração da conta
 
-A conexão Google OAuth ainda é feita pelo rclone, não por uma janela de login própria do aplicativo. Execute `rclone config` no terminal (ou use **Contas → Configurar**). Selecione o backend Google Drive e conclua a autorização OAuth no navegador pelo fluxo oficial do rclone. Volte ao aplicativo e clique em **Atualizar**. **Nunca digite sua senha Google dentro do Drive para Linux.** Não publique o arquivo `rclone.conf`.
+Em **Contas → Conectar Google**, informe um nome novo para a conta e um **Client ID OAuth do tipo Desktop** criado no Google Cloud. O aplicativo inicia o fluxo OAuth do rclone em segundo plano; a autorização ocorre no navegador padrão. Nenhuma senha ou token é coletado pela interface. É necessário criar seu próprio Client ID e habilitar a API Google Drive; consulte [instruções do rclone](https://rclone.org/drive/#making-your-own-client-id). A autorização requer navegador e pode falhar por configuração incorreta do consentimento OAuth. Como alternativa, execute `rclone config` no terminal (ou use **Contas → Configurar**). Selecione o backend Google Drive e conclua a autorização OAuth no navegador pelo fluxo oficial do rclone. Volte ao aplicativo e clique em **Atualizar**. **Nunca digite sua senha Google dentro do Drive para Linux.** Não publique o arquivo `rclone.conf`.
 
 Escolha uma pasta local existente em **Contas**. Antes de transferir arquivos importantes, teste com uma conta e pasta de teste e mantenha backup independente.
 
@@ -42,4 +42,4 @@ O workflow `.github/workflows/build-deb.yml` executa compilação sintática Pyt
 
 ## Versionamento
 
-Até **0.9.6**, versões Alpha. **1.0.0 Beta** será o marco de início da fase Beta, sujeito a QA; depois seguem versões incrementais. Consulte [SECURITY.md](SECURITY.md) para cuidados de autenticação, permissões e divulgação de vulnerabilidades.
+Até **0.9.7**, versões Alpha. **1.0.0 Beta** será o marco de início da fase Beta, sujeito a QA; depois seguem versões incrementais. Consulte [SECURITY.md](SECURITY.md) para cuidados de autenticação, permissões e divulgação de vulnerabilidades.
