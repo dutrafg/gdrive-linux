@@ -10,7 +10,7 @@ from gi.repository import Gtk, GLib, Gio
 from rclone_backend import list_remotes, copy_command, list_files
 from settings import load_settings, save_settings
 from progress import parse_progress
-from google_oauth import google_config_command
+from google_oauth import google_config_command, verify_google_remote
 from sync_plan import local_inventory, remote_inventory, conservative_plan
 from safe_sync import execute_additions
 from ui_kit import label, card, action, nav, format_size, section_title, row
@@ -647,12 +647,19 @@ class DriveWindow(Gtk.ApplicationWindow):
         name.set_placeholder_text("Nome da conta (ex.: pessoal)")
         name.set_text("meu_drive")
         start_page.append(name)
+        advanced = Gtk.Expander(label="Credenciais avançadas (opcional)")
         optional = Gtk.Entry()
-        optional.set_placeholder_text("Client ID próprio (opcional)")
-        start_page.append(optional)
-        hint = Gtk.Label(label="Você pode deixar o Client ID vazio e usar o cliente padrão do rclone.")
+        optional.set_placeholder_text("Client ID próprio do Google Cloud")
+        advanced.set_child(optional)
+        start_page.append(advanced)
+        hint = Gtk.Label(label="O Client ID compartilhado do rclone está sendo descontinuado em 2026. Se falhar, consulte a configuração avançada.")
         hint.set_wrap(True)
         start_page.append(hint)
+        guide = Gtk.LinkButton.new_with_label(
+            "https://rclone.org/drive/#making-your-own-client-id",
+            "Como configurar o Google Drive no rclone")
+        guide.set_halign(Gtk.Align.START)
+        start_page.append(guide)
         wizard.add_named(start_page, "start")
         waiting = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
         waiting.add_css_class("drive-wizard-head")
@@ -698,7 +705,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             show_step(1)
             self.status.set_text("Aguardando autorização no navegador…")
             threading.Thread(target=self.google_auth_worker,
-                             args=(command, dialog, wizard, result_label, show_step, action),
+                             args=(command, dialog, wizard, result_label, show_step, action, name, optional),
                              daemon=True).start()
 
         action.connect("clicked", begin)
@@ -706,7 +713,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         wizard.set_visible_child_name("start")
         dialog.present()
 
-    def google_auth_worker(self, command, dialog, wizard, result_label, show_step, action):
+    def google_auth_worker(self, command, dialog, wizard, result_label, show_step, action, name, optional):
         """Do not capture or display OAuth token-bearing rclone output."""
         try:
             if command[3] in list_remotes():
@@ -715,30 +722,39 @@ class DriveWindow(Gtk.ApplicationWindow):
             else:
                 result = subprocess.run(command, stdout=subprocess.DEVNULL,
                                         stderr=subprocess.DEVNULL, timeout=300)
-                success = result.returncode == 0
-                if success:
-                    # Verify the remote exists before showing success to the user.
-                    success = command[3] in list_remotes()
-                message = ("Conta conectada! Atualize a lista e escolha sua conta."
-                           if success else
-                           "A autorização não foi concluída. Verifique o navegador e tente novamente.")
+                created = result.returncode == 0 and command[3] in list_remotes()
+                if created:
+                    GLib.idle_add(show_step, 2)
+                    success = verify_google_remote(command[3])
+                else:
+                    success = False
+                message = ("Conta conectada e acesso confirmado!" if success else
+                           "Conta cadastrada, mas sem acesso confirmado. Confira o navegador e as credenciais."
+                           if created else
+                           "Não foi possível concluir o OAuth. Confira a configuração do Google e tente novamente.")
         except subprocess.TimeoutExpired:
-            success, message = False, "Tempo de autorização esgotado. Tente novamente."
+            success, message = False, "Tempo de autorização ou verificação esgotado. Tente novamente."
         except (OSError, subprocess.SubprocessError):
             success, message = False, "O rclone não iniciou. Verifique se está instalado."
         GLib.idle_add(self.complete_google_auth, dialog, wizard, result_label,
-                      show_step, action, success, message)
+                      show_step, action, name, optional, success, message)
 
-    def complete_google_auth(self, dialog, wizard, label, show_step, action, success, message):
+    def complete_google_auth(self, dialog, wizard, label, show_step, action, name, optional, success, message):
         if not dialog.get_visible():
             return False
         wizard.set_visible_child_name("finished")
         show_step(3 if success else 2)
         label.set_text(message)
-        action.set_visible(False)
-        self.status.set_text(message)
+        self.notice(message, "success" if success else "error")
         if success:
+            action.set_visible(False)
+            self.navigate("accounts")
             self.refresh()
+        else:
+            name.set_sensitive(True)
+            optional.set_sensitive(True)
+            action.set_label("Tentar novamente")
+            action.set_sensitive(True)
         return False
 
     def configure(self, *_):
