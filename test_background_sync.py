@@ -1,5 +1,8 @@
 """QA for continuous, conflict-safe Google Drive mirroring (no Google account required)."""
 import os
+import json
+import subprocess
+import sys
 import shutil
 import tempfile
 import unittest
@@ -110,6 +113,25 @@ class RcloneMirrorIntegrationTests(unittest.TestCase):
     def run_sync(self):
         return run_once(config=self.config, state_base=self.state,
                         backup_base=self.backups)
+
+    def test_background_cli_without_gtk_window(self):
+        """Simulate the systemd oneshot with the desktop application closed."""
+        root = Path(self.temp.name)
+        home = root / "isolated-home"
+        configdir = home / ".config" / "gdrive-linux"
+        configdir.mkdir(parents=True)
+        (configdir / "settings.json").write_text(
+            json.dumps(self.config), encoding="utf-8")
+        (self.folder / "created-while-closed.txt").write_text(
+            "offline creation", encoding="utf-8")
+        env = os.environ.copy()
+        env["HOME"] = str(home)
+        process = subprocess.run(
+            [sys.executable, str(Path(__file__).with_name("background_sync.py")), "--once"],
+            env=env, capture_output=True, text=True, timeout=50)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertEqual((self.cloud / "created-while-closed.txt").read_text(),
+                         "offline creation")
 
     def test_selected_folder_receives_and_uploads_new_files(self):
         (self.folder / "saved-locally.txt").write_text("from computer", encoding="utf-8")
