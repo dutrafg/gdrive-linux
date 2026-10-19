@@ -91,7 +91,8 @@ def mount_diagnosis(path, state=None, journal=None):
     """Give distinct ready/startup/failed states; never claim a mount from systemd alone."""
     mounted = mount_ready(path)
     if mounted:
-        return "Disco virtual montado. Você pode abri-lo no gerenciador de arquivos."
+        return ("Disco virtual montado no FUSE. O acesso aos arquivos depende "
+                "da conexão e da cota da API Google.")
     state = state if state is not None else service_state()
     if state == "activating":
         return "O serviço está iniciando; aguarde o rclone preparar a montagem FUSE."
