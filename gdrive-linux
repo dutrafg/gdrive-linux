@@ -10,6 +10,7 @@ from gi.repository import Gtk, GLib, Gio
 from rclone_backend import list_remotes, copy_command, list_files
 from settings import load_settings, save_settings
 from progress import parse_progress
+from google_oauth import google_config_command
 
 VERSION = "0.9.7"
 
@@ -294,12 +295,54 @@ class DriveWindow(Gtk.ApplicationWindow):
         return True
 
     def connect_google(self, *_):
-        """Open rclone's own OAuth configuration in a terminal."""
-        self.status.set_text("Abrindo configuração Google pelo rclone. A autorização ocorre no navegador.")
+        dialog = Gtk.Window(title="Conectar Google Drive", transient_for=self, modal=True)
+        dialog.set_default_size(440, 240)
+        panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        panel.set_margin_top(18)
+        panel.set_margin_bottom(18)
+        panel.set_margin_start(18)
+        panel.set_margin_end(18)
+        dialog.set_child(panel)
+        info = Gtk.Label(label="Crie um cliente OAuth do tipo Desktop no Google Cloud. A autorização será aberta pelo rclone no navegador.")
+        info.set_wrap(True)
+        panel.append(info)
+        name = Gtk.Entry()
+        name.set_placeholder_text("Nome da conta (ex.: meu_drive)")
+        panel.append(name)
+        client = Gtk.Entry()
+        client.set_placeholder_text("Client ID (*.apps.googleusercontent.com)")
+        panel.append(client)
+        action = Gtk.Button(label="Autorizar no navegador")
+        panel.append(action)
+        def start(_button):
+            try:
+                command = google_config_command(name.get_text().strip(), client.get_text().strip())
+            except ValueError as exc:
+                info.set_text(str(exc))
+                return
+            dialog.close()
+            self.status.set_text("Aguardando autorização Google no navegador…")
+            threading.Thread(target=self.google_auth_worker, args=(command,), daemon=True).start()
+        action.connect("clicked", start)
+        dialog.present()
+
+    def google_auth_worker(self, command):
         try:
-            subprocess.Popen(["x-terminal-emulator", "-e", "rclone", "config"])
-        except OSError as exc:
-            self.status.set_text("Não foi possível abrir o assistente do rclone: " + str(exc))
+            # Prevent overwriting an existing rclone remote and its OAuth tokens.
+            if command[3] in list_remotes():
+                GLib.idle_add(self.status.set_text, "Essa conta já existe no rclone. Escolha outro nome.")
+                return
+            result = subprocess.run(command, stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL, timeout=240)
+            if result.returncode:
+                GLib.idle_add(self.status.set_text, "Autorização não concluída. Confira o navegador e a configuração OAuth.")
+            else:
+                GLib.idle_add(self.refresh)
+                GLib.idle_add(self.status.set_text, "Conta criada. Selecione-a em Contas.")
+        except subprocess.TimeoutExpired:
+            GLib.idle_add(self.status.set_text, "Tempo limite de autorização atingido.")
+        except (OSError, subprocess.SubprocessError) as exc:
+            GLib.idle_add(self.status.set_text, "Falha ao iniciar autorização pelo rclone.")
 
     def configure(self, *_):
         try:
