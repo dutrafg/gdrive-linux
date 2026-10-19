@@ -39,6 +39,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.current_history = None
         self.path_parts = []
         self.preferences = load_settings()
+        self.account_names = self.preferences.get("account_names", {})
         self.folder = Path(self.preferences.get(
             "folder", str(Path.home() / "GoogleDrive"))).expanduser()
         self.remotes = Gtk.StringList.new([])
@@ -209,6 +210,14 @@ class DriveWindow(Gtk.ApplicationWindow):
         account_card.append(row_remote)
         self.account_identity = label("Nenhuma conta selecionada", "drive-account-identity", wrap=True)
         account_card.append(self.account_identity)
+        account_card.append(label(
+            "Identificação opcional desta conta (nome ou e-mail informado por você):",
+            "drive-small-note", wrap=True))
+        self.account_name_entry = Gtk.Entry()
+        self.account_name_entry.set_placeholder_text("Ex.: Conta pessoal ou nome@gmail.com")
+        account_card.append(self.account_name_entry)
+        account_card.append(action("Salvar identificação", self.save_account_name,
+                                   "document-save-symbolic"))
         self.account_connection = label(
             "Selecione uma conta e verifique o acesso para confirmar a conexão.",
             "drive-muted", wrap=True)
@@ -405,7 +414,7 @@ class DriveWindow(Gtk.ApplicationWindow):
     def persist(self):
         try:
             account = self.selected_remote() or ""
-            save_settings(self.folder, account)
+            save_settings(self.folder, account, self.account_names)
             self.preferences["account"] = account
             self.preferences["folder"] = str(self.folder)
         except OSError as exc:
@@ -418,14 +427,19 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.verify_generation += 1
         remote = self.selected_remote()
         self.account_identity.set_text(
-            "Conta selecionada: " + remote if remote else "Nenhuma conta selecionada")
+            ("Conta selecionada: " + self.account_display(remote))
+            if remote else "Nenhuma conta selecionada")
+        self.account_name_entry.set_text(self.account_names.get(remote, "") if remote else "")
+        self.account_name_entry.set_sensitive(bool(remote))
         self.account_connection.set_text(
             "Conta configurada no rclone • acesso ainda não verificado"
             if remote else "Nenhuma conta configurada ou selecionada.")
         self.verify_button.set_sensitive(bool(remote))
-        self.sidebar_account.set_text("Conta: " + remote if remote else
-                                      "Conta: nenhuma selecionada")
-        self.home_accounts.set_text(remote if remote else "Nenhuma conta conectada")
+        self.sidebar_account.set_text(
+            "Conta: " + self.account_display(remote)
+            if remote else "Conta: nenhuma selecionada")
+        self.home_accounts.set_text(self.account_display(remote)
+                                    if remote else "Nenhuma conta conectada")
         self.path_parts = []
         self.browse_generation += 1
         self.preview_generation += 1
@@ -435,6 +449,32 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.files_summary.set_text("Clique em Atualizar para listar os arquivos.")
         while row := self.files_list.get_row_at_index(0):
             self.files_list.remove(row)
+
+    def account_display(self, remote):
+        """Show a user-supplied label plus the actual configured rclone remote."""
+        if not remote:
+            return "Nenhuma conta"
+        nickname = self.account_names.get(remote, "").strip()
+        return (nickname + " (" + remote + ")") if nickname else remote
+
+    def save_account_name(self, *_):
+        remote = self.selected_remote()
+        if not remote:
+            self.notice("Selecione uma conta antes de salvar a identificação.", "warning")
+            return
+        value = self.account_name_entry.get_text().strip()
+        if len(value) > 120:
+            self.notice("Identificação muito longa (máximo 120 caracteres).", "warning")
+            return
+        if value:
+            self.account_names[remote] = value
+        else:
+            self.account_names.pop(remote, None)
+        self.persist()
+        self.account_identity.set_text("Conta selecionada: " + self.account_display(remote))
+        self.sidebar_account.set_text("Conta: " + self.account_display(remote))
+        self.home_accounts.set_text(self.account_display(remote))
+        self.notice("Identificação local salva. Isso não verifica o e-mail Google.", "success")
 
     def verify_selected_account(self, *_):
         """Verify the selected rclone remote without exposing credentials."""
@@ -462,7 +502,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.verify_button.set_sensitive(True)
         if verified:
             self.account_connection.set_text("✓ Acesso ao Google Drive confirmado")
-            self.home_accounts.set_text(remote + " • acesso confirmado")
+            self.home_accounts.set_text(self.account_display(remote) +
+                                        " • acesso confirmado")
             self.notice("Acesso confirmado para a conta " + remote + ".", "success")
         else:
             self.account_connection.set_text("Não foi possível validar o acesso desta conta.")
@@ -879,7 +920,8 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.restoring_accounts = False
         self.account_changed()
         self.home_accounts.set_text(
-            self.selected_remote() if self.selected_remote() else "Nenhuma conta selecionada")
+            self.account_display(self.selected_remote())
+            if self.selected_remote() else "Nenhuma conta selecionada")
         self.sidebar_rclone.set_text("●  rclone disponível")
         self.settings_rclone.set_text("rclone disponível • " + str(len(names)) + " conta(s) configurada(s)")
         if not self.busy and not self.sync_busy:
