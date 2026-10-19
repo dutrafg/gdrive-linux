@@ -31,7 +31,7 @@ from diagnostics import collect_diagnostics, format_report
 from rclone_errors import friendly, is_rate_limit
 from ui_kit import label, card, action, nav, format_size, section_title, row, button_flow
 
-VERSION = "0.14.0"
+VERSION = "0.14.1"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
