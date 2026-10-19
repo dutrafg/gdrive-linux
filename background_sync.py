@@ -126,13 +126,22 @@ def inventories(remote, folder, includes=(), excludes=()):
     return (filtered_inventory(local, includes, excludes),
             filtered_inventory(cloud, includes, excludes))
 
-def transfer_one(remote, folder, operation, relative, run_id, backup_base=BACKUP_BASE):
+def transfer_one(remote, folder, operation, relative, run_id, backup_base=BACKUP_BASE,
+                 expected_local_md5=None):
     """One rclone copy. For modified files the old destination is backed up."""
     target = safe_local_target(folder, relative)
     cloud = remote_path(remote, relative)
     uploading = operation.startswith("upload")
     if uploading and not target.is_file():
         raise ValueError("Arquivo local não encontrado")
+    # Re-read local content immediately before the transfer. A file edited by
+    # the user since the inventory cannot be uploaded/overwritten silently.
+    # This is especially important while the user saves from LibreOffice.
+    if expected_local_md5 is not None:
+        if (not target.is_file() or target.is_symlink()
+                or local_md5(target) != expected_local_md5):
+            raise RuntimeError("Arquivo local mudou durante a sincronização; "
+                               "a transferência foi suspensa para protegê-lo.")
     if not uploading and operation.endswith("new") and (target.exists() or target.is_symlink()):
         raise ValueError("Destino local já existe")
     src, dst = (str(target), cloud) if uploading else (cloud, str(target))
@@ -286,7 +295,9 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
             for operation, relative in actions:
                 # Destination backups protect one-sided updates. A failed copy
                 # must not be hidden by a later network error while rescanning.
-                transfer_one(remote, folder, operation, relative, run_id, backup_base)
+                expected = fingerprint(local.get(relative))
+                transfer_one(remote, folder, operation, relative, run_id, backup_base,
+                             expected_local_md5=expected)
                 copied += 1
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
             original_error = exc
