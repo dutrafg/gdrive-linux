@@ -175,6 +175,38 @@ class RcloneMirrorIntegrationTests(unittest.TestCase):
         self.assertEqual((self.folder / "shared.txt").read_text(), "local edit")
         self.assertEqual((self.cloud / "shared.txt").read_text(), "cloud edit")
 
+    def test_opt_in_local_deletion_moves_remote_to_recovery(self):
+        (self.folder / "document.txt").write_text("recover me", encoding="utf-8")
+        self.run_sync()
+        (self.folder / "document.txt").unlink()
+        self.config["auto_archive_deletions"] = True
+        result = self.run_sync()
+        self.assertEqual(result["archived"], 1)
+        self.assertFalse((self.cloud / "document.txt").exists())
+        self.assertTrue(list((self.cloud / ".gdrive-linux-history").rglob("document.txt")))
+
+    def test_opt_in_cloud_deletion_archives_local_copy(self):
+        (self.folder / "document.txt").write_text("recover me", encoding="utf-8")
+        self.run_sync()
+        (self.cloud / "document.txt").unlink()
+        self.config["auto_archive_deletions"] = True
+        result = self.run_sync()
+        self.assertEqual(result["archived"], 1)
+        self.assertFalse((self.folder / "document.txt").exists())
+        self.assertTrue(list(self.backups.rglob("document.txt")))
+
+    def test_large_queue_drains_by_batches(self):
+        for i in range(7):
+            (self.cloud / ("file" + str(i) + ".txt")).write_text("data", encoding="utf-8")
+        first = run_once(config=self.config, state_base=self.state,
+                         backup_base=self.backups, max_files=3)
+        self.assertEqual(first["copied"], 3)
+        self.assertEqual(first["pending"], 4)
+        second = run_once(config=self.config, state_base=self.state,
+                          backup_base=self.backups, max_files=3)
+        self.assertEqual(second["copied"], 3)
+        self.assertEqual(second["pending"], 1)
+
     def test_deleted_cloud_file_is_not_removed_locally(self):
         (self.folder / "keep.txt").write_text("safe", encoding="utf-8")
         self.run_sync()
