@@ -151,6 +151,12 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
     if not isinstance(remote, str) or not remote or not isinstance(folder_value, str):
         raise ValueError("Selecione uma conta e pasta nas configurações")
     folder = Path(folder_value).expanduser().resolve()
+    home = Path.home().resolve()
+    if (folder == home or folder in home.parents
+            or STATE_BASE.resolve().is_relative_to(folder)
+            or BACKUP_BASE.resolve().is_relative_to(folder)):
+        raise ValueError("Escolha uma subpasta exclusiva para o Drive; "
+                         "não sincronize a pasta pessoal inteira ou pastas de backup.")
     if not folder.is_dir():
         raise ValueError("A pasta escolhida está indisponível; nenhuma ação executada")
     if remote not in list_remotes():
