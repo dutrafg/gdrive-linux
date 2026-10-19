@@ -135,6 +135,50 @@ def transfer_one(remote, folder, operation, relative, run_id, backup_base=BACKUP
             raise RuntimeError(friendly(result.stderr))
         raise RuntimeError("Falha de acesso ou escrita durante a transferência: " + relative)
 
+def archive_unilateral_deletions(remote, folder, local, cloud, baseline,
+                                 run_id, backup_base=BACKUP_BASE, max_items=20):
+    """Opt-in reconciliation: move unchanged surviving copies into recoverable archives.
+
+    The caller holds the job lock. It never permanently deletes a file.
+    Both-edited files and paths without a verified MD5 stay conflicted.
+    """
+    archived = []
+    for relative in sorted(set(baseline)):
+        if len(archived) >= max_items:
+            break
+        if is_private_path(relative):
+            continue
+        old = baseline[relative]
+        local_still = relative in local
+        cloud_still = relative in cloud
+        if local_still == cloud_still:
+            continue
+        if local_still:
+            if fingerprint(local[relative]) != old:
+                continue
+            target = safe_local_target(folder, relative)
+            archive_root = backup_base / job_key(remote, folder) / "deleted" / run_id
+            archive = archive_root / relative
+            archive.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            if archive.exists():
+                raise RuntimeError("Arquivo de recuperação já existe.")
+            shutil.move(str(target), str(archive))
+        else:
+            if fingerprint(cloud[relative]) != old:
+                continue
+            src = remote_path(remote, relative)
+            dst = remote_path(remote,
+                ".gdrive-linux-history/archived-deletions/" + run_id + "/" + relative)
+            done = subprocess.run(["rclone", "moveto", src, dst] + rclone_limits(),
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                                  text=True, timeout=900)
+            if done.returncode:
+                if is_rate_limit(done.stderr):
+                    raise RuntimeError(friendly(done.stderr))
+                raise RuntimeError("Falha ao arquivar arquivo remoto; nada foi apagado permanentemente.")
+        archived.append(relative)
+    return archived
+
 def refresh_baseline(previous, local, cloud):
     """Commit only verified identical pairs; keep older baseline for conflicts."""
     result = dict(previous)
@@ -191,8 +235,15 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
             # Gradual batches; never require manually reducing the batch.
             actions = actions[:max_files]
         copied = 0
+        archived = []
         run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
         try:
+            if config.get("auto_archive_deletions") is True:
+                archived = archive_unilateral_deletions(remote, folder, local, cloud,
+                                                       baseline, run_id, backup_base)
+                for relative in archived:
+                    baseline.pop(relative, None)
+                conflicts = [path for path in conflicts if path not in archived]
             for operation, relative in actions:
                 # No deletion. If an old target was modified concurrently,
                 # destination backup keeps the former copy recoverable.
@@ -204,7 +255,8 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
             new_base = refresh_baseline(baseline, local_after, cloud_after)
             save_private_json(snapshot_path, {"md5": new_base})
         status = {"state": "ok" if not conflicts else "conflicts",
-                  "copied": copied, "conflicts": len(conflicts),
+                  "copied": copied, "archived": len(archived),
+                  "conflicts": len(conflicts),
                   "pending": max(0, planned_count - copied),
                   "time": datetime.now(timezone.utc).isoformat()}
         save_private_json(state_base / "latest.json", status)
