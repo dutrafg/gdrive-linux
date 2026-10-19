@@ -1,6 +1,6 @@
 # Drive para Linux
 
-Cliente experimental **GTK4** para acessar o Google Drive no Linux usando **rclone**. Versão atual: **0.8.0 Alpha**. Não é um cliente oficial do Google.
+Cliente experimental **GTK4** para acessar o Google Drive no Linux usando **rclone**. Versão atual: **0.9.0 Alpha**. Não é um cliente oficial do Google.
 
 ## Funcionalidades
 
@@ -22,7 +22,7 @@ sudo apt install python3 python3-gi gir1.2-gtk-4.0 rclone
 python3 gdrive-linux
 ```
 
-Para instalar o pacote `.deb`, baixe o artefato da execução aprovada em [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions) e instale com `sudo apt install ./gdrive-linux_0.8.0_all.deb`. O arquivo só estará disponível após o workflow gerar o artefato.
+Para instalar o pacote `.deb`, baixe o artefato da execução aprovada em [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions) e instale com `sudo apt install ./gdrive-linux_0.9.0_all.deb`. O arquivo só estará disponível após o workflow gerar o artefato.
 
 ## Configuração da conta
 
