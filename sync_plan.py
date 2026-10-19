@@ -25,6 +25,8 @@ def validate_relative(path):
     if not isinstance(path, str) or not path or path.startswith("/"):
         raise ValueError("Caminho inválido")
     parts = Path(path).parts
+    if path.startswith("./") or "//" in path or path.endswith("/") or ":" in path.split("/")[0]:
+        raise ValueError("Caminho inválido")
     if any(p in (".", "..") for p in parts) or "\x00" in path or "\\" in path:
         raise ValueError("Caminho inválido")
     return path
@@ -39,11 +41,11 @@ def local_inventory(folder):
             continue
         relative = path.relative_to(root).as_posix()
         validate_relative(relative)
-        digest = hashlib.sha256()
+        digest = hashlib.md5()
         with path.open("rb") as stream:
             for chunk in iter(lambda: stream.read(1024 * 1024), b""):
                 digest.update(chunk)
-        found[relative] = ("sha256", digest.hexdigest())
+        found[relative] = ("md5", digest.hexdigest())
     return found
 
 def remote_inventory(remote, timeout=120):
@@ -66,4 +68,8 @@ def remote_inventory(remote, timeout=120):
 
 def conservative_plan(local, remote):
     """Different hash algorithms are incomparable: flag as conflict."""
-    return plan_sync(local, remote)
+    shared = set(local) & set(remote)
+    comparable = {key for key in shared if local[key][0] == remote[key][0]}
+    conflicts = sorted((shared - comparable) | {key for key in comparable if local[key] != remote[key]})
+    return SyncPlan(tuple(sorted(set(remote) - set(local))),
+                    tuple(sorted(set(local) - set(remote))), tuple(conflicts))
