@@ -36,7 +36,7 @@ Escolha uma pasta local existente em **Contas**. Antes de transferir arquivos im
 
 ## Testes e empacotamento
 
-O workflow `.github/workflows/build-deb.yml` executa compilação sintática Python, testes unitários, um teste de inicialização GTK4 sob Xvfb e cria o pacote Debian. **A existência do workflow não significa que todas as execuções passaram.** Consulte [Actions](https://github.com/dutrafg/gdrive-linux/actions) para o estado atual. O teste de inicialização não substitui testes visuais em GNOME/KDE ou operações reais com uma conta Google.
+O workflow `.github/workflows/build-deb.yml` executa compilação sintática Python, testes unitários, um teste de inicialização GTK4 em Wayland nativo usando Weston headless e cria o pacote Debian. **A existência do workflow não significa que todas as execuções passaram.** Consulte [Actions](https://github.com/dutrafg/gdrive-linux/actions) para o estado atual. GTK4 usa Wayland nativamente quando a sessão Linux oferece esse protocolo; o aplicativo não força X11 e mantém compatibilidade com ambientes X11. O teste de inicialização não substitui testes visuais em GNOME/KDE ou operações reais com uma conta Google.
 
 ## Versionamento
 
