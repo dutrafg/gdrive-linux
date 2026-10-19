@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from mount_checks import inspect_mount, format_mount_report
+from mount_checks import inspect_mount, format_mount_report, test_google_read_access
 from mount_drive import validate_mount
 from mount_health import classify_mount_error
 
@@ -68,6 +68,27 @@ class MountPreflightTests(unittest.TestCase):
                 validate_mount(
                     {"account": "demo", "folder": str(Path(tmp) / "mirror")},
                     root=online, require_tools=False)
+
+    @patch("mount_checks.subprocess.run")
+    def test_google_probe_classifies_quota_without_leaking_tokens(self, run):
+        run.return_value.returncode = 1
+        run.return_value.stderr = ("Error 403 RATE_LIMIT_EXCEEDED "
+                                   "access_token=private-do-not-print")
+        success, message = test_google_read_access("meu_drive")
+        self.assertFalse(success)
+        self.assertIn("403", message)
+        self.assertNotIn("private-do-not-print", message)
+        self.assertEqual(run.call_args.args[0][:3],
+                         ["rclone", "lsd", "meu_drive:"])
+
+    @patch("mount_checks.subprocess.run")
+    def test_google_probe_success_is_read_only(self, run):
+        run.return_value.returncode = 0
+        run.return_value.stderr = ""
+        success, message = test_google_read_access("meu_drive")
+        self.assertTrue(success)
+        self.assertIn("confirmada", message)
+        self.assertNotIn("sync", run.call_args.args[0])
 
     def test_mount_error_classification_no_raw_oauth_info(self):
         raw = "Conta ausente no rclone deste serviço. token=do-not-share"
