@@ -303,11 +303,11 @@ class DriveWindow(Gtk.ApplicationWindow):
 
     def build_sync(self):
         sync_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-        automatic = card("Atualização automática",
-            "A cada cinco minutos, enquanto o aplicativo estiver aberto.",
+        automatic = card("Sincronização contínua",
+            "Aproximadamente a cada minuto, mesmo com esta janela fechada (sessão Linux ativa).",
             "view-refresh-symbolic")
         auto_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
-        auto_row.append(label("Baixar novos arquivos da nuvem", hexpand=True))
+        auto_row.append(label("Espelhar alterações locais e remotas", hexpand=True))
         self.auto_switch = Gtk.Switch()
         self.auto_switch.set_valign(Gtk.Align.CENTER)
         self.auto_switch.connect("notify::active", self.auto_changed)
@@ -316,8 +316,12 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.auto_info = label("Desativada. Nenhuma transferência em segundo plano.",
                                "drive-muted", wrap=True)
         automatic.append(self.auto_info)
-        automatic.append(label("Não substitui arquivos locais existentes e não exclui arquivos.",
+        automatic.append(label("Arquivos novos e alterações sem conflito são transferidos; versões anteriores ficam guardadas. Exclusões e conflitos não são propagados automaticamente.",
                                "drive-muted", wrap=True))
+        self.background_status = label("Aguardando verificação do serviço…", "drive-muted", wrap=True)
+        automatic.append(self.background_status)
+        automatic.append(action("Ver status do serviço", self.update_background_status,
+                                "view-refresh-symbolic"))
         manual = card("Sincronização seletiva",
             "Simule primeiro; transfira apenas arquivos exclusivos, preservando conflitos.",
             "emblem-synchronizing-symbolic")
