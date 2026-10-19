@@ -41,6 +41,6 @@ StartupNotify=true
 Terminal=false
 EOF
 filename="gdrive-linux_${version}_all.deb"
-dpkg-deb --build "$pkg" "$filename"
+dpkg-deb --root-owner-group --build "$pkg" "$filename"
 test "$(dpkg-deb -f "$filename" Version)" = "$version"
 echo "Pacote criado: $(pwd)/$filename"
