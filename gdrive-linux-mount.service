@@ -7,8 +7,12 @@ After=network-online.target
 [Service]
 Type=notify
 NotifyAccess=main
+# Keep the same rclone and fusermount search paths in graphical and user services.
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=HOME=%h
+WorkingDirectory=%h
 ExecStart=/usr/bin/python3 /usr/share/gdrive-linux/mount_drive.py --serve
-TimeoutStartSec=120
+TimeoutStartSec=180
 Restart=on-failure
 RestartSec=300s
 Nice=5
