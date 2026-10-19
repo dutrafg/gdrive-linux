@@ -427,6 +427,24 @@ class DriveWindow(Gtk.ApplicationWindow):
             "*.tmp ignora temporários em qualquer subpasta. O modo de sincronização "
             "manual ainda não usa esses filtros.", "drive-muted", wrap=True))
         sync_page.append(filters)
+        profiles_card = card("Contas e pastas independentes",
+              "Cada conta pode ter uma pasta e direção diferente, inclusive em disco externo. "
+              "Pause a sincronização antes de alterar perfis.",
+              "system-users-symbolic")
+        profiles_card.append(label("Selecione a conta em Contas, escolha a pasta e o modo acima; depois salve.", "drive-muted", wrap=True))
+        self.profile_list = Gtk.ListBox()
+        self.profile_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        self.profile_list.add_css_class("drive-history")
+        profiles_card.append(self.profile_list)
+        profiles_card.append(button_flow(
+            action("Adicionar ou atualizar conta/pasta", self.add_sync_profile,
+                   "list-add-symbolic", primary=True),
+            action("Remover perfil selecionado", self.remove_sync_profile,
+                   "list-remove-symbolic")))
+        self.profiles_status = label("Nenhum perfil registrado.", "drive-muted", wrap=True)
+        profiles_card.append(self.profiles_status)
+        sync_page.append(profiles_card)
+        self.update_profiles_ui()
         conflicts = card("Conflitos e diferenças",
             "Os arquivos compartilhados divergentes não são modificados automaticamente.",
             "dialog-warning-symbolic")
