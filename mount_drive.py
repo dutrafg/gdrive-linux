@@ -69,9 +69,12 @@ def command(config, root=MOUNT_ROOT, require_tools=False, create=False):
     # per-user cache avoids different VFS writeback locations across logins.
     cache = Path.home() / ".cache" / "gdrive-linux" / "rclone"
     argv.extend(["--cache-dir", str(cache)])
-    default_config = Path.home() / ".config" / "rclone" / "rclone.conf"
-    if default_config.is_file():
-        argv.extend(["--config", str(default_config)])
+    configured_file = os.environ.get("RCLONE_CONFIG")
+    config_path = (Path(configured_file).expanduser().resolve()
+                   if configured_file else
+                   Path.home() / ".config" / "rclone" / "rclone.conf")
+    if config_path.is_file():
+        argv.extend(["--config", str(config_path)])
     if read_only:
         argv.append("--read-only")
     return argv
