@@ -1,0 +1,12 @@
+[Unit]
+Description=Drive para Linux - verificar automaticamente arquivos a cada minuto
+
+[Timer]
+OnStartupSec=30s
+OnUnitInactiveSec=1min
+AccuracySec=15s
+Persistent=true
+Unit=gdrive-linux-sync.service
+
+[Install]
+WantedBy=timers.target
