@@ -10,7 +10,9 @@ from pathlib import Path
 
 from mount_drive import mount_path, validate_mount, MOUNT_ROOT
 from mount_health import mount_ready
-from rclone_backend import list_remotes
+from rclone_backend import list_remotes, remote_path
+from rclone_errors import friendly, is_rate_limit, rclone_limits
+from mount_health import classify_mount_error
 
 
 def _command_ready(argv, timeout=10):
@@ -104,3 +106,22 @@ def format_mount_report(result):
         for item in result["checks"]]
     details.append(result["note"])
     return "\n".join(details)
+
+
+def test_google_read_access(remote, timeout=45):
+    """One explicitly requested Google request; sanitize all errors and names."""
+    try:
+        location = remote_path(remote)
+        result = subprocess.run(
+            ["rclone", "lsd", location, "--max-depth", "1"] + rclone_limits(),
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
+            timeout=timeout, check=False)
+        if result.returncode == 0:
+            return True, "Conexão Google confirmada; a conta permite leitura."
+        if is_rate_limit(result.stderr):
+            return False, friendly(result.stderr)
+        return False, classify_mount_error(result.stderr)
+    except subprocess.TimeoutExpired:
+        return False, "O Google não respondeu no prazo. Verifique a conexão antes de montar."
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return False, "Não foi possível consultar a conta Google; verifique rclone e o remoto."
