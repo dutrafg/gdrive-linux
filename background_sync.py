@@ -255,6 +255,7 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
         copied = 0
         archived = []
         run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
+        original_error = None
         try:
             if mode == "bidirectional" and config.get("auto_archive_deletions") is True:
                 archived = archive_unilateral_deletions(remote, folder, local, cloud,
@@ -263,15 +264,23 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
                     baseline.pop(relative, None)
                 conflicts = [path for path in conflicts if path not in archived]
             for operation, relative in actions:
-                # No deletion. If an old target was modified concurrently,
-                # destination backup keeps the former copy recoverable.
+                # Destination backups protect one-sided updates. A failed copy
+                # must not be hidden by a later network error while rescanning.
                 transfer_one(remote, folder, operation, relative, run_id, backup_base)
                 copied += 1
-        finally:
-            # Keep track of copies actually verified even if a later copy fails.
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+            original_error = exc
+        try:
+            # Preserve independently verified completed copies, but never
+            # replace the original failure with an unrelated re-scan failure.
             local_after, cloud_after = inventories(remote, folder, includes, excludes)
             new_base = refresh_baseline(baseline, local_after, cloud_after)
             save_private_json(snapshot_path, {"md5": dict(excluded_baseline, **new_base)})
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+            if original_error is None:
+                raise
+        if original_error is not None:
+            raise original_error
         remaining = max(0, planned_count - copied)
         status = {"state": ("conflicts" if conflicts else
                             "partial" if remaining else "ok"),
