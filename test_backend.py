@@ -31,3 +31,21 @@ class BackendTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+class AutomaticCopySafetyTests(unittest.TestCase):
+    def test_automatic_download_preserves_newer_files(self):
+        import tempfile
+        from pathlib import Path
+        from rclone_backend import copy_command
+        with tempfile.TemporaryDirectory() as folder:
+            cmd = copy_command("drive", Path(folder), "download", preserve_newer=True)
+            self.assertIn("--update", cmd)
+
+    def test_automatic_upload_is_rejected(self):
+        import tempfile
+        from pathlib import Path
+        from rclone_backend import copy_command
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaises(ValueError):
+                copy_command("drive", Path(folder), "upload", preserve_newer=True)
+
+
