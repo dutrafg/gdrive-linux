@@ -1,6 +1,6 @@
 # Política de segurança — Drive para Linux
 
-**Estado:** 0.13.0 Alpha, software experimental. Não há auditoria de segurança independente nem garantia de uso em produção.
+**Estado:** 0.13.1 Alpha, software experimental. Não há auditoria de segurança independente nem garantia de uso em produção.
 
 ## Reportar vulnerabilidades
 
@@ -42,7 +42,7 @@ Informe versão, distribuição Linux, passos de reprodução, impacto e registr
 
 Use uma conta e pasta de testes, confirme origem e destino, mantenha backup separado e examine o resultado antes de repetir uma operação. Relate qualquer sobrescrita inesperada ou problema de autorização pelo canal privado de segurança.
 
-## Serviço de sincronização contínua (v0.13.0)
+## Serviço de sincronização contínua (v0.13.1)
 
 - A ativação exige selecionar uma conta remota e uma pasta local existentes. O botão da interface ativa um `systemd --user` timer; o daemon confere a preferência salva e retorna sem fazer nada se desativado.
 - O daemon usa bloqueio exclusivo para impedir execuções simultâneas **do próprio serviço**. Transferências manuais iniciadas separadamente ainda exigem cuidado: evite usar os botões manuais enquanto a rotina automática estiver ativa.
@@ -59,3 +59,10 @@ Use uma conta e pasta de testes, confirme origem e destino, mantenha backup sepa
 - O Google Fotos usa um backend independente do rclone e faz envio **manual** sem exclusão. Credenciais próprias devem ser configuradas pelo assistente seguro do rclone; não cole client secrets na GUI, nos logs ou em argumentos de linha de comando. O Photos API não fornece acesso irrestrito para download histórico.
 - Exclusões do espelhamento não são executadas automaticamente. A revisão exige seleção e confirmação dupla, usa bloqueio exclusivo do sincronizador e verifica o hash da cópia remanescente em relação ao histórico antes de arquivá-la em local recuperável. Ela não equivale a uma lixeira do Google oficial e não substitui backups.
 - Funcionalidades de montagem FUSE e upload para uma conta Google Photos real ainda dependem de homologação em um Zorin OS real e de credenciais válidas; os testes automatizados só verificam a construção segura dos comandos e fluxos locais.
+
+## Proteções adicionais contra limite 403 e exclusões (v0.13.1)
+
+- A API retornou `403 RATE_LIMIT_EXCEEDED` no Zorin OS ao usar o Client ID compartilhado. O aplicativo limita chamadas HTTP com `--tpslimit 2 --tpslimit-burst 2`, reduz a concorrência, classifica o erro sem expor resposta JSON completa e aplica um intervalo mínimo de 15 minutos entre novas tentativas automáticas após detectar bloqueio. **Limitar requisições não contorna quota esgotada do projeto OAuth compartilhado**; configure Client ID/Client Secret próprios via rclone.
+- A preferência de exclusão automática fica desativada por padrão. A ativação exige confirmação gráfica. Quando habilitada, apenas a cópia **cujo hash ainda coincide com o histórico** pode ser movida para um arquivo recuperável, nunca apagada definitivamente. Exclusões e renomeações concorrentes ainda podem resultar em conflitos; restauração é manual.
+- O disco virtual começa somente leitura. Habilitar gravação exige ação explícita e **remontagem**, com aviso sobre cache VFS e riscos de gravação pendente. Confirme que a API tem quota antes de editar arquivos grandes. Exclusões via rclone mount usam o comportamento padrão do Google Drive (envio para lixeira), mas não substituem backups independentes.
+- O serviço systemd é revalidado na abertura do aplicativo quando o usuário já tinha ativado o recurso. Persistência da preferência não significa que uma transferência específica ocorreu; verificar timer e último estado para diagnosticar.
