@@ -1949,8 +1949,16 @@ class DriveWindow(Gtk.ApplicationWindow):
         elif state == "ok":
             message = (str(status.get("copied", 0)) + " arquivo(s) transferido(s), " +
                        str(status.get("pending", 0)) + " pendente(s), " +
-                       str(status.get("archived", 0)) + " arquivado(s). " +
+                       str(status.get("archived", 0)) + " arquivado(s), " +
+                       str(status.get("skipped_direction", 0)) +
+                       " não transferido(s) pelo modo escolhido. " +
                        str(status.get("time", "")))
+        elif state == "partial":
+            message = (str(status.get("copied", 0)) + " arquivo(s) transferido(s), " +
+                       str(status.get("pending", 0)) +
+                       " aguardando próximo ciclo. " + str(status.get("time", "")))
+        elif state == "busy":
+            message = "Uma sincronização já está em execução; aguarde a conclusão."
         elif state == "conflicts":
             message = (str(status.get("conflicts", 0)) +
                        " conflito(s) pendente(s). " + str(status.get("time", "")))
