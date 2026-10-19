@@ -85,3 +85,17 @@ def row(*items):
     for item in items:
         container.append(item)
     return container
+
+def button_flow(*buttons):
+    """Wrap action buttons instead of clipping them in narrow GTK4 cards."""
+    flow = Gtk.FlowBox()
+    flow.set_selection_mode(Gtk.SelectionMode.NONE)
+    flow.set_min_children_per_line(1)
+    flow.set_max_children_per_line(3)
+    flow.set_column_spacing(8)
+    flow.set_row_spacing(8)
+    flow.set_homogeneous(False)
+    flow.set_halign(Gtk.Align.START)
+    for button in buttons:
+        flow.insert(button, -1)
+    return flow
