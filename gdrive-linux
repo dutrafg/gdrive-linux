@@ -19,6 +19,7 @@ from mount_drive import command as mount_command, mount_path, MOUNT_ROOT
 from photos_export import upload_media
 from desktop_files import find_openable_file
 from deletion_review import load_candidates, archive_deletion
+from diagnostics import collect_diagnostics, format_report
 from ui_kit import label, card, action, nav, format_size, section_title, row, button_flow
 
 VERSION = "0.13.0"
@@ -435,6 +436,18 @@ class DriveWindow(Gtk.ApplicationWindow):
         system.append(action("Configuração avançada (terminal)", self.configure,
                              "utilities-terminal-symbolic"))
         settings_page.append(system)
+        diagnostic = card("Diagnóstico de compatibilidade Zorin OS",
+            "Verificação sem cópias nem modificações de arquivos.",
+            "system-search-symbolic")
+        diagnostic.append(action("Executar diagnóstico completo",
+                                 self.run_diagnostics, "view-refresh-symbolic",
+                                 primary=True))
+        self.diagnostics_text = label(
+            "Verifique rclone, a conta, a pasta, o timer e o FUSE com um clique.",
+            "drive-muted", wrap=True)
+        self.diagnostics_text.set_selectable(True)
+        diagnostic.append(self.diagnostics_text)
+        settings_page.append(diagnostic)
         privacy = card("Privacidade e proteção",
             "O aplicativo não solicita sua senha Google e não armazena tokens nas preferências.",
             "security-high-symbolic")
@@ -527,6 +540,16 @@ class DriveWindow(Gtk.ApplicationWindow):
             "drive-muted", wrap=True))
         page.append(limits)
         self.pages.add_titled(page, "photos", "Google Fotos")
+
+    def run_diagnostics(self, *_):
+        self.diagnostics_text.set_text("Executando verificações do Linux…")
+        threading.Thread(target=self.diagnostics_worker, daemon=True).start()
+
+    def diagnostics_worker(self):
+        report = collect_diagnostics(dict(self.preferences,
+                              account=self.selected_remote() or "",
+                              folder=str(self.folder)))
+        GLib.idle_add(self.diagnostics_text.set_text, format_report(report))
 
     def review_deletions(self, *_):
         remote = self.selected_remote()
