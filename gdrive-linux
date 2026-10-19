@@ -8,8 +8,9 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, GLib
 from rclone_backend import list_remotes, copy_command, list_files
 from settings import load_settings, save_settings
+from progress import parse_progress
 
-VERSION = "0.5.1"
+VERSION = "0.6.0"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -20,6 +21,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.preferences = load_settings()
         self.restoring_accounts = False
         self.cancel_requested = False
+        self.progress_known = False
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         root.set_margin_top(20)
         root.set_margin_bottom(20)
@@ -284,6 +286,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.cancel_button.set_sensitive(True)
         self.status.set_text("Transferência em andamento…")
         self.progress.set_fraction(0)
+        self.progress_known = False
         self.progress.set_text("Transferindo…")
         self.pages.set_visible_child_name("activity")
         self.progress.pulse()
@@ -293,7 +296,8 @@ class DriveWindow(Gtk.ApplicationWindow):
     def pulse_progress(self):
         if not self.busy:
             return False
-        self.progress.pulse()
+        if not self.progress_known:
+            self.progress.pulse()
         return True
 
     def worker(self, command):
@@ -308,7 +312,11 @@ class DriveWindow(Gtk.ApplicationWindow):
             if self.cancel_requested:
                 proc.terminate()
             for line in proc.stdout:
-                GLib.idle_add(self.append, line.rstrip())
+                progress = parse_progress(line)
+                if progress is not None:
+                    GLib.idle_add(self.update_progress, progress)
+                else:
+                    GLib.idle_add(self.append, line.rstrip())
             code = proc.wait()
             GLib.idle_add(self.status.set_text,
                           "Transferência cancelada." if self.cancel_requested else
@@ -318,6 +326,17 @@ class DriveWindow(Gtk.ApplicationWindow):
         finally:
             self.proc = None
             GLib.idle_add(self.finish)
+
+    def update_progress(self, data):
+        if not self.busy:
+            return False
+        self.progress_known = True
+        self.progress.set_fraction(data["percentage"] / 100)
+        detail = str(data["percentage"]) + "% • " + data["transferred"]
+        if data["speed"]:
+            detail += " • " + data["speed"]
+        self.progress.set_text(detail)
+        return False
 
     def finish(self):
         self.busy = False
