@@ -95,3 +95,19 @@ button:disabled { opacity: 0.47; }
 .drive-dialog .drive-step-active { font-weight: 800; }
 .drive-content button.drive-primary:disabled,
 .drive-dialog button.drive-connect:disabled { background: #a1b9d5; border-color: #a1b9d5; opacity: 1; }
+
+/* Zorin OS: explicit remote identity and safely stacked synchronization actions. */
+.drive-card .drive-account-identity {
+  color: #143b63;
+  font-weight: 750;
+  font-size: 17px;
+  padding: 10px 12px;
+  background: #e9f3ff;
+  border-radius: 9px;
+}
+.drive-button-group { margin-top: 2px; }
+.drive-button-group button {
+  min-height: 40px;
+  margin: 0;
+}
+.drive-file-list row label { color: #18324f; }
