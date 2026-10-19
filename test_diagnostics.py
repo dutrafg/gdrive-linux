@@ -18,6 +18,19 @@ class DiagnosticsTests(unittest.TestCase):
         self.assertFalse(results["Acesso à conta Google"]["ok"])
         self.assertIn("rclone.org", results["rclone"]["detail"])
 
+    @patch("diagnostics.shutil.which", return_value="/usr/bin/rclone")
+    @patch("diagnostics.run_probe", return_value=False)
+    def test_detects_insecure_rclone_conf_permissions_without_leaking_text(self, probe, which):
+        with tempfile.TemporaryDirectory() as root:
+            conf = Path(root) / "rclone.conf"
+            conf.write_text("access_token=SECRET_TEST", encoding="utf-8")
+            conf.chmod(0o644)
+            records = collect_diagnostics({
+                "rclone_config_file": str(conf), "account": "", "folder": str(root)})
+            result = {item["name"]: item for item in records}
+            self.assertFalse(result["Proteção do arquivo OAuth"]["ok"])
+            self.assertNotIn("SECRET_TEST", format_report(records))
+
     def test_report_contains_no_tokens(self):
         text = format_report([{"name": "rclone", "ok": True, "detail": "Disponível"},
                               {"name": "FUSE", "ok": False, "detail": "Instale fuse3"}])
