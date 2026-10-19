@@ -1,24 +1,82 @@
-/* GTK4 theme for Drive para Linux. No external assets or network required. */
-window.drive-window { background: #f0f5fb; color: #183251; }
-.drive-sidebar { background: #192b41; padding: 22px 14px; min-width: 192px; }
-.drive-sidebar label { color: #d6e2f1; }
-.drive-sidebar button { color: #d6e2f1; background: transparent; border: 0; padding: 13px 16px; border-radius: 10px; }
-.drive-sidebar button:hover { background: #2d4562; }
-.drive-sidebar button.suggested-action { background: #1271ed; color: white; }
-.drive-content { background: #f0f5fb; padding: 24px; }
-.drive-header { padding: 5px 0 18px 0; }
-.drive-header .title-1 { color: #142c49; font-weight: 800; }
-.drive-card { background: #ffffff; border: 1px solid #dce5ef; border-radius: 14px; padding: 17px; }
-.drive-card label { color: #243f60; }
-.drive-muted { color: #60748d; }
-.drive-connect { background: #126ded; color: white; border-radius: 9px; font-weight: bold; padding: 12px 18px; }
-.drive-connect:hover { background: #075bd0; }
-.drive-content button { border-radius: 9px; }
-.drive-content entry { border-radius: 9px; min-height: 32px; }
-.drive-content dropdown { border-radius: 9px; min-height: 32px; }
-.drive-banner { color: #214563; background: #e4edf7; border-radius: 9px; padding: 11px; }
-.drive-dialog { background: #ffffff; }
-.drive-wizard-head { padding: 15px; background: #eaf2fb; border-radius: 12px; }
-.drive-step { background: #edf2f8; border-radius: 24px; padding: 9px 15px; }
-.drive-step-active { background: #1271ed; color: white; border-radius: 24px; padding: 9px 15px; }
-.drive-status { background: #e5edf7; border-radius: 9px; padding: 12px; color: #183251; }
+/* Drive para Linux • UI refinement, GTK4 CSS. Native controls, no network fonts. */
+window.drive-window, .drive-content { background: #f3f6fb; color: #18324f; }
+.drive-sidebar {
+  min-width: 194px;
+  background: #192b41;
+  padding: 24px 15px;
+}
+.drive-sidebar label { color: #e7eef9; }
+.drive-brand { color: #fff; font-size: 19px; font-weight: 800; }
+.drive-side-muted { color: #b8cce3; font-size: 12px; }
+.drive-side-divider { background: #3a5068; min-height: 1px; margin: 14px 0; }
+.drive-side-section { color: #b6cbe0; font-size: 11px; font-weight: 800; margin: 10px 12px; }
+.drive-sidebar button.drive-nav {
+  min-height: 42px;
+  background: transparent; border: 0;
+  border-radius: 9px; padding: 9px 13px;
+  color: #d5e1ed; box-shadow: none;
+}
+.drive-sidebar button.drive-nav label { color: #d5e1ed; }
+.drive-sidebar button.drive-nav:hover { background: #2c4058; }
+.drive-sidebar button.drive-nav.drive-selected {
+  background: #176bea; color: white; font-weight: 700;
+}
+.drive-sidebar button.drive-nav.drive-selected label { color: white; }
+.drive-content { padding: 22px 30px 28px; }
+.drive-header { padding: 2px 0 10px 0; }
+.drive-page-title { color: #162c47; font-size: 28px; font-weight: 800; }
+.drive-section-title { color: #173352; font-size: 21px; font-weight: 750; }
+.drive-card-title { color: #193451; font-size: 16px; font-weight: 750; }
+.drive-card-icon { color: #176bea; }
+.drive-muted { color: #60768f; font-size: 13px; }
+.drive-hero { color: #142d49; font-size: 29px; font-weight: 800; }
+.drive-card {
+  background: #fff;
+  color: #18324f;
+  border: 1px solid #dce5f0;
+  border-radius: 13px;
+  padding: 20px 22px;
+  box-shadow: 0 2px 6px alpha(#233c5c, 0.05);
+}
+.drive-card label { color: #1b3958; }
+.drive-card .drive-muted { color: #60768f; }
+.drive-card .drive-card-title { color: #193451; }
+.drive-card button { border-radius: 9px; }
+button.drive-primary, button.drive-connect {
+  min-height: 42px; padding: 8px 17px; border-radius: 9px;
+  color: white; background: #156ade; border: 1px solid #156ade;
+  font-weight: 750; box-shadow: none;
+}
+button.drive-primary:hover, button.drive-connect:hover { background: #0859c9; }
+button.drive-secondary {
+  min-height: 40px; padding: 7px 15px; border-radius: 9px;
+  background: #edf2f8; border: 1px solid #dde6f1; color: #1c4269;
+  box-shadow: none;
+}
+button.drive-secondary:hover { background: #dce9f8; }
+button.drive-danger { background: #fff1f0; border-color: #ffcecb; color: #a62d27; }
+button.drive-danger:hover { background: #ffe0dd; }
+button:disabled { opacity: 0.47; }
+.drive-banner { color: #214563; background: #eaf2fb; border-radius: 9px; padding: 11px; }
+.drive-status { color: #254464; background: #e7eff9; border-radius: 10px; padding: 14px; }
+.drive-status-success { color: #17633e; background: #e4f5eb; }
+.drive-status-error { color: #9a2c2c; background: #ffefed; }
+.drive-status-warning { color: #895900; background: #fff5db; }
+.drive-data-line { border-bottom: 1px solid #e9eff5; padding: 8px 0; }
+.drive-empty { border: 1px dashed #c9d7e6; border-radius: 11px; padding: 24px; color: #688099; }
+.drive-file-list, .drive-history { border-radius: 11px; background: #fff; }
+.drive-file-list row, .drive-history row { padding: 8px 10px; border-bottom: 1px solid #edf1f6; }
+.drive-file-list row:hover { background: #eaf3fe; }
+.drive-toolbar { padding: 10px 0 15px 0; }
+.drive-path { color: #254b70; font-weight: 600; }
+.drive-metric { color: #136add; font-size: 24px; font-weight: 750; }
+.drive-small-note { color: #697e94; font-size: 12px; }
+.drive-separator { background: #e1eaf2; min-height: 1px; margin: 8px 0; }
+.drive-dialog { background: #fff; }
+.drive-wizard-head { background: #f0f5fc; border-radius: 12px; padding: 21px; }
+.drive-step { color: #536b87; background: #edf2f8; border-radius: 30px; padding: 9px 12px; font-size: 12px; }
+.drive-step-active { color: #fff; background: #156ade; border-radius: 30px; padding: 9px 12px; font-weight: bold; }
+.drive-wizard-message { color: #234b72; background: #e7f1ff; border-radius: 8px; padding: 13px; }
+.drive-content entry, .drive-dialog entry { min-height: 36px; border-radius: 9px; }
+.drive-content dropdown { min-height: 36px; border-radius: 9px; }
+.drive-quiet { color: #667c92; }
