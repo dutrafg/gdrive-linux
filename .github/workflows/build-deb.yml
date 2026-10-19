@@ -9,7 +9,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate Python syntax
-        run: python3 -m py_compile gdrive-linux rclone_backend.py
+        run: |
+          python3 -m py_compile gdrive-linux rclone_backend.py
           python3 -m unittest -v test_backend
       - name: Package
         run: |
@@ -20,7 +21,7 @@ jobs:
           chmod 755 pkg/usr/bin/gdrive-linux
           cat > pkg/DEBIAN/control <<'EOF'
           Package: gdrive-linux
-          Version: 0.2.1
+          Version: 0.3.0
           Section: utils
           Priority: optional
           Architecture: all
@@ -37,8 +38,8 @@ jobs:
           Categories=Network;FileTransfer;
           Terminal=false
           EOF
-          dpkg-deb --build pkg gdrive-linux_0.2.1_all.deb
+          dpkg-deb --build pkg gdrive-linux_0.3.0_all.deb
       - uses: actions/upload-artifact@v4
         with:
           name: gdrive-linux-deb
-          path: gdrive-linux_0.2.1_all.deb
+          path: gdrive-linux_0.3.0_all.deb
