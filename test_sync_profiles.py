@@ -50,6 +50,20 @@ class ProfileTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "não está montado"):
                 ensure_external_volume_present("/media/testuser/UNPLUGGED/folder")
 
+    def test_rejects_home_as_sync_root(self):
+        with self.assertRaisesRegex(ValueError, "pasta pessoal"):
+            normalize_profile({"account": "personal", "folder": str(Path.home())})
+
+    def test_rejects_symlink_profile_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            dest = base / "destination"
+            dest.mkdir()
+            alias = base / "alias"
+            alias.symlink_to(dest, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "simbólica"):
+                normalize_profile({"account": "personal", "folder": str(alias)})
+
     def test_rejects_virtual_drive_inside_mirror(self):
         with self.assertRaisesRegex(ValueError, "montagem FUSE"):
             normalize_profile({"account":"drive",
