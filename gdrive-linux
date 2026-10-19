@@ -1670,7 +1670,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.browse()
 
     def create_default_folder(self, *_):
-        if self.auto_enabled:
+        if self.profile_edit_blocked():
             self.notice("Pause a sincronização contínua antes de criar/trocar a pasta.", "warning")
             return
         """Create only the user's explicit default directory after a click."""
@@ -1687,9 +1687,13 @@ class DriveWindow(Gtk.ApplicationWindow):
         except OSError as exc:
             self.notice("Não foi possível criar a pasta: " + str(exc), "error")
 
+    def profile_edit_blocked(self):
+        return (self.busy or self.sync_busy or self.auto_enabled or
+                self.mount_busy or self.mount_autostart_on)
+
     def choose_rclone_config(self, *_):
-        if self.auto_enabled or self.mount_busy or self.mount_autostart_on:
-            self.notice("Pause os serviços automáticos antes de alterar rclone.conf.", "warning")
+        if self.profile_edit_blocked():
+            self.notice("Conclua transferências e pause os serviços antes de alterar rclone.conf.", "warning")
             return
         dialog = Gtk.FileChooserNative(
             title="Selecionar arquivo rclone.conf",
@@ -1697,6 +1701,10 @@ class DriveWindow(Gtk.ApplicationWindow):
             accept_label="Usar configuração", cancel_label="Cancelar")
         def response(d, code):
             if code == Gtk.ResponseType.ACCEPT:
+                if self.profile_edit_blocked():
+                    self.notice("Operação em andamento; seleção ignorada por segurança.", "warning")
+                    d.destroy()
+                    return
                 file = d.get_file()
                 try:
                     if not file or not file.get_path():
@@ -1728,15 +1736,18 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.notice("Configuração padrão do rclone selecionada.", "success")
 
     def choose_folder(self, *_):
-        if self.auto_enabled or self.mount_busy or self.mount_autostart_on:
-            self.notice("Pause a sincronização, desative a montagem automática "
-                        "e aguarde a operação FUSE antes de trocar a pasta.", "warning")
+        if self.profile_edit_blocked():
+            self.notice("Conclua transferências e pause os serviços antes de trocar a pasta.", "warning")
             return
         dialog = Gtk.FileChooserNative(title="Escolher pasta local", transient_for=self,
                                       action=Gtk.FileChooserAction.SELECT_FOLDER,
                                       accept_label="Selecionar", cancel_label="Cancelar")
         def response(d, code):
             if code == Gtk.ResponseType.ACCEPT:
+                if self.profile_edit_blocked():
+                    self.notice("Operação em andamento; seleção ignorada por segurança.", "warning")
+                    d.destroy()
+                    return
                 file = d.get_file()
                 if file and file.get_path():
                     self.folder = Path(file.get_path())
@@ -1897,7 +1908,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             "Modo compatível com versões anteriores: conta e pasta atuais.")
 
     def add_sync_profile(self, *_):
-        if self.auto_enabled:
+        if self.profile_edit_blocked():
             self.notice("Pause a sincronização antes de editar os perfis.", "warning")
             return
         remote = self.selected_remote()
@@ -1925,7 +1936,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.notice("Erro ao configurar perfil: " + str(exc), "warning")
 
     def remove_sync_profile(self, *_):
-        if self.auto_enabled:
+        if self.profile_edit_blocked():
             self.notice("Pause a sincronização antes de remover perfis.", "warning")
             return
         selected = self.profile_list.get_selected_row()
