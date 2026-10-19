@@ -23,7 +23,7 @@ from sync_filters import parse_entry, parse_rules
 from sync_profiles import MODES, validate_profiles
 from filemanager_bookmarks import set_bookmark
 from google_docs_export import export_documents, export_folder
-from tray_autostart import set_indicator_autostart, indicator_enabled
+from tray_autostart import set_indicator_autostart, indicator_enabled, indicator_available
 from photos_export import upload_media
 from desktop_files import find_openable_file
 from deletion_review import load_candidates, archive_deletion
@@ -713,6 +713,15 @@ class DriveWindow(Gtk.ApplicationWindow):
 
     def tray_changed(self, switch, *_):
         wanted = switch.get_active()
+        if wanted:
+            # GTK4 and GTK3 cannot safely be imported into the same GUI process.
+            # Probe AppIndicator through a separate process before opting in.
+            if not indicator_available():
+                self.tray_status.set_text(
+                    "Este Zorin não oferece Ayatana/AppIndicator. "
+                    "Instale gir1.2-ayatanaappindicator3-0.1 e tente novamente.")
+                switch.set_active(False)
+                return
         try:
             set_indicator_autostart(wanted)
             if wanted:
