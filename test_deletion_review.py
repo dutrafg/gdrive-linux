@@ -1,4 +1,5 @@
 import os
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -44,15 +45,63 @@ class DeletionRcloneTests(unittest.TestCase):
     def test_local_archive_preserves_bytes(self, inv, remotes):
         target = self.local / "keep.docx"
         target.write_text("original", encoding="utf-8")
-        inv.return_value = ({"keep.docx": SAME}, {})
+        actual = hashlib.md5(b"original").hexdigest()
+        inv.return_value = ({"keep.docx": ("md5", actual)}, {})
         self.state.mkdir()
         save_private_json(self.state / (job_key("demo", self.local) + ".json"),
-                          {"md5": {"keep.docx": SAME[1]}})
+                          {"md5": {"keep.docx": actual}})
         archived = archive_deletion("demo", self.local, "keep.docx", "cloud",
                                     state_base=self.state, backup_base=self.backup)
         self.assertFalse(target.exists())
         self.assertEqual(Path(archived).read_text(encoding="utf-8"), "original")
         self.assertEqual(load_snapshot(self.state, self.local)["md5"], {})
+
+    @patch("deletion_review.load_settings")
+    @patch("deletion_review.inventories")
+    def test_manual_review_respects_ignored_paths(self, inventory, settings):
+        settings.return_value = {
+            "account": "demo", "folder": str(self.local),
+            "sync_includes": ["Documentos/"], "sync_excludes": ["*.tmp"]}
+        self.state.mkdir()
+        save_private_json(self.state / (job_key("demo", self.local) + ".json"),
+                          {"md5": {"Documentos/notes.tmp": SAME[1],
+                                   "Documentos/report.txt": SAME[1]}})
+        inventory.return_value = ({
+            "Documentos/notes.tmp": SAME,
+            "Documentos/report.txt": SAME}, {})
+        choices = load_candidates("demo", self.local, state_base=self.state)
+        self.assertEqual(choices, [("Documentos/report.txt", "cloud")])
+        inventory.assert_called_once_with(
+            "demo", self.local, ["Documentos/"], ["*.tmp"])
+
+    @patch("deletion_review.load_settings")
+    @patch("deletion_review.inventories")
+    @patch("deletion_review.list_remotes", return_value=["demo"])
+    def test_filtered_out_item_cannot_be_archived(self, remotes, inventory, settings):
+        settings.return_value = {"account": "demo", "folder": str(self.local),
+                                 "sync_includes": ["Documentos/"],
+                                 "sync_excludes": ["*.tmp"]}
+        self.state.mkdir()
+        save_private_json(self.state / (job_key("demo", self.local) + ".json"),
+                          {"md5": {"Documentos/notes.tmp": SAME[1]}})
+        inventory.return_value = ({"Documentos/notes.tmp": SAME}, {})
+        with self.assertRaisesRegex(ValueError, "mudou desde"):
+            archive_deletion("demo", self.local, "Documentos/notes.tmp",
+                             "cloud", state_base=self.state, backup_base=self.backup)
+
+    @patch("deletion_review.list_remotes", return_value=["demo"])
+    @patch("deletion_review.inventories")
+    def test_edit_after_inventory_never_archives_current_copy(self, inventory, remotes):
+        target = self.local / "edited.txt"
+        target.write_text("newer version", encoding="utf-8")
+        inventory.return_value = ({"edited.txt": SAME}, {})
+        self.state.mkdir()
+        save_private_json(self.state / (job_key("demo", self.local) + ".json"),
+                          {"md5": {"edited.txt": SAME[1]}})
+        with self.assertRaisesRegex(ValueError, "mudou antes"):
+            archive_deletion("demo", self.local, "edited.txt", "cloud",
+                             state_base=self.state, backup_base=self.backup)
+        self.assertTrue(target.exists())
 
     @patch("deletion_review.list_remotes", return_value=["demo"])
     @patch("deletion_review.subprocess.run")
