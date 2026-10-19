@@ -72,9 +72,16 @@ def inspect_mount(config, root=MOUNT_ROOT):
           "fusermount instalado." if helper else
           "Instale fuse3 (sudo apt install fuse3).")
     device = Path("/dev/fuse")
-    check("Dispositivo FUSE", device.exists(),
-          "/dev/fuse encontrado." if device.exists() else
+    available = device.exists()
+    check("Dispositivo FUSE", available,
+          "/dev/fuse encontrado." if available else
           "O dispositivo /dev/fuse não existe. Confirme módulo FUSE e permissões do Linux.")
+    if available:
+        accessible = os.access(device, os.R_OK | os.W_OK)
+        check("Acesso ao FUSE", accessible,
+              "Usuário pode abrir /dev/fuse." if accessible else
+              "Sem acesso de leitura/escrita a /dev/fuse. Verifique permissões "
+              "e políticas de segurança do Zorin OS; não execute o app como root.")
     systemd = _command_ready(["systemctl", "--user", "show-environment"])
     check("Serviço do usuário", systemd,
           "systemd --user acessível." if systemd else
