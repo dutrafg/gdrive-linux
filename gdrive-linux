@@ -550,6 +550,32 @@ class DriveWindow(Gtk.ApplicationWindow):
         settings_page.append(privacy)
         self.pages.add_titled(settings_page, "settings", "Configurações")
 
+    def build_docs(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=15)
+        block = card("Exportar documentos Google",
+            "Crie cópias de Docs, Planilhas e Apresentações para editar no LibreOffice "
+            "ou Microsoft Office. Os originais na nuvem não são modificados.",
+            "x-office-document-symbolic")
+        block.append(label("Formato preferido das cópias:", "drive-muted"))
+        self.docs_format = Gtk.DropDown.new_from_strings([
+            "LibreOffice: ODT / ODS / ODP",
+            "Microsoft Office: DOCX / XLSX / PPTX",
+            "PDF: somente leitura"])
+        block.append(self.docs_format)
+        self.docs_export_status = label(
+            "As cópias são salvas fora da pasta espelhada, em Documents/DriveExports/<conta>.",
+            "drive-muted", wrap=True)
+        block.append(self.docs_export_status)
+        block.append(action("Exportar documentos da conta selecionada",
+                            self.confirm_docs_export, "document-save-symbolic",
+                            primary=True))
+        block.append(label("Não é uma conversão bidirecional: alterações no Office ou "
+            "LibreOffice não são enviadas de volta ao documento nativo automaticamente. "
+            "Arquivos com o mesmo nome no destino não são sobrescritos.",
+            "drive-muted", wrap=True))
+        page.append(block)
+        self.pages.add_titled(page, "docs", "Documentos Google")
+
     def build_mount(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=15)
         intro = card("Disco virtual do Google Drive",
