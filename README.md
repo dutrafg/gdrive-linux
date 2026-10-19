@@ -1,6 +1,6 @@
 # Drive para Linux
 
-Cliente desktop experimental **GTK4 + rclone** para Google Drive em Linux. **Versão 0.14.4 Alpha**. Projeto independente, não oficial do Google.
+Cliente desktop experimental **GTK4 + rclone** para Google Drive em Linux. **Versão 0.14.5 Alpha**. Projeto independente, não oficial do Google.
 
 ## Interface
 
@@ -132,7 +132,7 @@ A sincronização contínua processa **até 100 arquivos por ciclo** e registra 
 
 Em **Configurações → Diagnóstico de compatibilidade Zorin OS**, confirme a pasta gravável, a conta autorizada, FUSE e o timer. O botão para ativar a sincronização agora solicita o primeiro ciclo imediatamente, e **Ver status do serviço** avisa se o timer real do Linux não está ativo. Mesmo com timer ativo, **um erro 403 impede transferir** até a API aceitar novamente.
 
-## Prioridades alta e média inspiradas no Insync — v0.14.4 Alpha
+## Prioridades alta e média inspiradas no Insync — v0.14.5 Alpha
 
 ### Inicialização automática do disco virtual
 Em **Disco virtual**, ative **Montar Drive automaticamente ao entrar no Linux**. O aplicativo usa `systemctl --user enable gdrive-linux-mount.service` e solicita a montagem atual de forma assíncrona. O serviço foi configurado com `Type=notify`, ou seja, não deve anunciar a montagem como pronta antes do rclone confirmar o FUSE. Ao entrar novamente no Zorin OS, a montagem será solicitada automaticamente, mesmo sem abrir a janela GTK4. O serviço exige sessão de usuário Linux, FUSE e conectividade; se a rede falhar tentará novamente com intervalo conservador. Desativar o controle também solicita a desmontagem da unidade atual.
@@ -163,7 +163,7 @@ Na nova seção **Documentos Google**, exporte cópias em **LibreOffice/ODF**, *
 O QA no Ubuntu/Wayland e os testes do rclone com remotos locais são obrigatórios antes da entrega. **Ainda dependem do Zorin OS real**: autorização OAuth do Google, montagem FUSE após login, suporte do painel ao AppIndicator, acesso a arquivos compartilhados com permissões específicas, e exportação de documentos nativos reais. O software permanece Alpha enquanto esses cenários não forem confirmados.
 
 
-## Correções da montagem no Zorin OS — v0.14.4 Alpha
+## Correções da montagem no Zorin OS — v0.14.5 Alpha
 
 Esta atualização responde ao erro **“Não foi possível montar”** que apareceu no teste. A montagem continua usando rclone/FUSE e `systemd --user` com `Type=notify`, como recomendado pelo rclone. Os ajustes incluem:
 
@@ -194,7 +194,7 @@ Para verificar o serviço manualmente: `systemctl --user status gdrive-linux-mou
 
 **Limites da validação:** os testes automatizados confirmam a estrutura do serviço, segurança, diagnósticos e inicialização GTK4; o teste FUSE com um remoto local só executa quando o runner oferece `/dev/fuse`. A montagem real do Google Drive e o funcionamento após login no Zorin continuam necessitando teste no computador.
 
-## Melhorias da v0.14.4 Alpha — montagem e segurança no Zorin OS
+## Melhorias da v0.14.5 Alpha — montagem e segurança no Zorin OS
 
 O pacote Debian agora instala rclone e fuse3 como dependências obrigatórias. A montagem recusa mudança de conta durante uma operação FUSE, pastas simbólicas e pontos sem permissão. O cache do rclone tem endereço previsível dentro da pasta pessoal; uma configuração RCLONE_CONFIG personalizada é respeitada na execução local, e o diagnóstico alerta quando o serviço de usuário pode não herdá-la.
 
@@ -204,7 +204,7 @@ Em Disco virtual, use Diagnosticar requisitos de montagem para verificar conta, 
 
 O indicador opcional de atividade só é habilitado se o suporte Ayatana/AppIndicator estiver disponível. Para várias contas, o indicador mostra a quantidade sem divulgar os nomes. O aplicativo ainda precisa de teste com a conta Google real no computador Zorin para homologação de montagem, autostart e gravação.
 
-## Revisão de integridade, configurações e QA — v0.14.4 Alpha
+## Revisão de integridade, configurações e QA — v0.14.5 Alpha
 
 Esta revisão segue a v0.14.2, com foco em confiabilidade e prevenção de informações incorretas na interface:
 
@@ -218,8 +218,18 @@ Esta revisão segue a v0.14.2, com foco em confiabilidade e prevenção de infor
 
 **Limitações mantidas:** autenticação OAuth real, montagem FUSE e criação/edição/exclusão de arquivos com sua conta Google precisam de testes no Zorin OS. Os testes em GitHub Actions usam ambientes Linux de CI e remotos locais do rclone; não equivalem a testes na conta Google pessoal.
 
-## Revisão de confiabilidade v0.14.4 Alpha
+## Revisão de confiabilidade v0.14.5 Alpha
 
 A revisão acrescenta proteção contra erros ocultados por uma segunda falha de inventário, conferência de MD5 antes de arquivar arquivos locais e revisão manual de exclusões que respeita filtros seletivos. Arquivos remotos sem MD5 comparável, como alguns documentos nativos Google, ficam para exportação específica em vez de causar downloads repetidos. O diagnóstico FUSE detecta também falta de permissão para criar a pasta da unidade virtual. O status da GUI atualiza a cada minuto usando somente dados locais, e o indicador alerta quando a sincronização não é recente. Consulte [RELEASE_0.14.4.md](RELEASE_0.14.4.md).
 
 **QA:** os testes em CI não comprovam a montagem real na sua instalação do Zorin OS nem acesso à conta Google sob bloqueio de API 403. A sincronização e a montagem continuam dependentes da autenticação, cota Google e permissões corretas do Linux.
+
+## Novidades da v0.14.5 Alpha — integridade e recuperação
+
+Foram adicionados controles para **Restaurar versões anteriores** em Sincronização, com seleção de cópias locais arquivadas e confirmação antes de criar uma cópia recuperada. O arquivo recuperado não sobrescreve documentos, não altera a nuvem e, quando a pasta Documentos for o próprio espelho, a recuperação ocorrerá numa pasta privada separada. Backups do Drive guardados remotamente no histórico do rclone continuam exigindo restauração específica e não aparecem nessa lista local.
+
+O sincronizador agora verifica se o arquivo local mudou entre o inventário e o início da transferência. Caso isso aconteça, interrompe a operação para proteger alterações recém-salvas. Também **recusa histórico de sincronização corrompido**: não recria o estado silenciosamente, pois isso poderia fazer um arquivo apagado reaparecer na nuvem.
+
+Em Configurações, a opção **Escolher rclone.conf existente** permite indicar um arquivo personalizado usado pela interface e pelos serviços em segundo plano. As preferências guardam **somente o caminho** desse arquivo, nunca sua senha, Client Secret ou token. A verificação de compatibilidade avisa quando o arquivo não existe ou pode ser lido por outros usuários.
+
+O plano completo e os critérios de QA estão em [RELEASE_0.14.5.md](RELEASE_0.14.5.md). A versão permanece Alpha; testes com OAuth e montagem FUSE no computador Zorin não podem ser presumidos apenas pelo CI.
