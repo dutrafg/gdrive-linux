@@ -859,6 +859,71 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.refresh_mount_status()
         return False
 
+    def bookmark_mount(self, *_):
+        remote = self.selected_remote()
+        if not remote:
+            self.notice("Selecione a conta para adicionar aos favoritos.", "warning")
+            return
+        try:
+            set_bookmark(remote, True)
+            self.notice("Disco virtual adicionado à barra lateral do Zorin Files.", "success")
+        except (OSError, ValueError) as exc:
+            self.notice("Falha ao adicionar favorito: " + str(exc), "error")
+
+    def remove_bookmark_mount(self, *_):
+        remote = self.selected_remote()
+        if not remote:
+            return
+        try:
+            set_bookmark(remote, False)
+            self.notice("Atalho removido dos favoritos, sem excluir arquivos.", "success")
+        except (OSError, ValueError) as exc:
+            self.notice("Não foi possível remover favorito: " + str(exc), "error")
+
+    def confirm_docs_export(self, *_):
+        remote = self.selected_remote()
+        if not remote:
+            self.notice("Selecione uma conta Google Drive antes de exportar.", "warning")
+            return
+        formats = ("libreoffice", "office", "pdf")
+        selected = self.docs_format.get_selected()
+        fmt = formats[selected] if selected < len(formats) else "libreoffice"
+        destination = export_folder(remote)
+        dialog = Gtk.Window(title="Confirmar exportação de documentos",
+                            transient_for=self, modal=True)
+        dialog.set_default_size(500, 240)
+        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        for edge in ("top", "bottom", "start", "end"):
+            getattr(body, "set_margin_" + edge)(20)
+        dialog.set_child(body)
+        body.append(section_title("Criar cópias de documentos Google?",
+             "Destino: " + str(destination) + "\nEsta operação apenas baixa "
+             "cópias compatíveis e não exclui nem altera documentos do Drive."))
+        body.append(action("Cancelar", lambda *_: dialog.close()))
+        def proceed(_button):
+            dialog.close()
+            self.docs_export_status.set_text("Exportando documentos; acompanhe o resultado aqui…")
+            threading.Thread(target=self.docs_export_worker,
+                             args=(remote, fmt), daemon=True).start()
+        body.append(action("Confirmar exportação", proceed,
+                           "document-save-symbolic", primary=True))
+        dialog.present()
+
+    def docs_export_worker(self, remote, fmt):
+        try:
+            result = export_documents(remote, self.folder, fmt)
+            message = "Exportação concluída. Cópias em: " + result["directory"]
+            success = True
+        except (ValueError, OSError, RuntimeError, subprocess.SubprocessError) as exc:
+            message = "Não foi possível exportar: " + str(exc)
+            success = False
+        GLib.idle_add(self.docs_export_complete, success, message)
+
+    def docs_export_complete(self, success, message):
+        self.docs_export_status.set_text(message)
+        self.notice(message, "success" if success else "error")
+        return False
+
     def mount_write_toggled(self, checkbox):
         if self.mount_busy:
             self.notice("Espere a montagem/desmontagem terminar.", "warning")
