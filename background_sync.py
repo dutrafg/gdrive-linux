@@ -238,13 +238,16 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
                              if p not in baseline}
         local, cloud = inventories(remote, folder, includes, excludes)
         actions, conflicts = build_plan(local, cloud, baseline)
+        actions_before_direction = len(actions)
         if mode == "upload":
             actions = [item for item in actions if item[0].startswith("upload")]
         elif mode == "download":
             actions = [item for item in actions if item[0].startswith("download")]
+        skipped_direction = actions_before_direction - len(actions)
         if dry_run:
             return {"state": "preview", "copied": 0,
-                    "conflicts": len(conflicts), "pending": len(actions)}
+                    "conflicts": len(conflicts), "pending": len(actions),
+                    "skipped_direction": skipped_direction}
         planned_count = len(actions)
         if len(actions) > max_files:
             # Gradual batches; never require manually reducing the batch.
@@ -269,10 +272,12 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
             local_after, cloud_after = inventories(remote, folder, includes, excludes)
             new_base = refresh_baseline(baseline, local_after, cloud_after)
             save_private_json(snapshot_path, {"md5": dict(excluded_baseline, **new_base)})
-        status = {"state": "ok" if not conflicts else "conflicts",
+        remaining = max(0, planned_count - copied)
+        status = {"state": ("conflicts" if conflicts else
+                            "partial" if remaining else "ok"),
                   "copied": copied, "archived": len(archived),
-                  "conflicts": len(conflicts),
-                  "pending": max(0, planned_count - copied),
+                  "conflicts": len(conflicts), "pending": remaining,
+                  "skipped_direction": skipped_direction,
                   "time": datetime.now(timezone.utc).isoformat()}
         status["account"] = remote
         status["folder"] = str(folder)
@@ -337,12 +342,16 @@ def run_profiles(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
                 "conflicts": 0, "profiles": []}
     states = {x.get("state") for x in results}
     state = ("quota" if "quota" in states else "error" if "error" in states
-             else "conflicts" if "conflicts" in states else "ok")
+             else "conflicts" if "conflicts" in states
+             else "partial" if "partial" in states
+             else "busy" if "busy" in states
+             else "preview" if dry_run else "ok")
     aggregate = {
         "state": state, "copied": sum(x.get("copied", 0) for x in results),
         "pending": sum(x.get("pending", 0) for x in results),
         "conflicts": sum(x.get("conflicts", 0) for x in results),
         "archived": sum(x.get("archived", 0) for x in results),
+        "skipped_direction": sum(x.get("skipped_direction", 0) for x in results),
         "profiles": results,
         "time": datetime.now(timezone.utc).isoformat(),
     }
