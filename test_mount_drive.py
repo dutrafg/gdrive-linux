@@ -76,6 +76,17 @@ class MountTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "simbólico"):
                 mount_path("personal", root)
 
+    def test_missing_mount_directory_with_unwritable_parent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "DriveOnline"
+            root.mkdir()
+            with patch("mount_drive.os.access", return_value=False):
+                with self.assertRaisesRegex(ValueError, "permissão para criar"):
+                    validate_mount({"account": "personal",
+                                    "folder": str(Path(tmp) / "mirror")},
+                                   root=root, require_tools=False, create=False)
+            self.assertFalse((root / "personal").exists())
+
     def test_preflight_detects_inaccessible_fuse_device(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "DriveOnline"
