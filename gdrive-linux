@@ -1485,6 +1485,65 @@ class DriveWindow(Gtk.ApplicationWindow):
         box.append(action("Fechar", lambda *_: dialog.close()))
         dialog.present()
 
+    def update_profiles_ui(self):
+        if not hasattr(self, "profile_list"):
+            return
+        while self.profile_list.get_row_at_index(0) is not None:
+            self.profile_list.remove(self.profile_list.get_row_at_index(0))
+        for index, profile in enumerate(self.sync_profiles):
+            entry = Gtk.ListBoxRow()
+            entry.profile_index = index
+            direction = {"bidirectional": "⇄", "upload": "↑", "download": "↓"}[profile["mode"]]
+            entry.set_child(label(profile["account"] + " " + direction + " " + profile["folder"], wrap=True))
+            self.profile_list.append(entry)
+        count = len(self.sync_profiles)
+        self.profiles_status.set_text(
+            str(count) + " perfil(is) independentes registrados." if count else
+            "Modo compatível com versões anteriores: conta e pasta atuais.")
+
+    def add_sync_profile(self, *_):
+        if self.auto_enabled:
+            self.notice("Pause a sincronização antes de editar os perfis.", "warning")
+            return
+        remote = self.selected_remote()
+        if not remote or not self.folder.is_dir():
+            self.notice("Selecione uma conta e pasta local existente.", "warning")
+            return
+        try:
+            includes = parse_entry(self.include_entry.get_text())
+            excludes = parse_entry(self.exclude_entry.get_text())
+            index = self.sync_mode_dropdown.get_selected()
+            mode = MODES[index] if index < len(MODES) else "bidirectional"
+            candidate = {"account": remote, "folder": str(self.folder.resolve()),
+                         "mode": mode, "sync_includes": includes,
+                         "sync_excludes": excludes, "enabled": True,
+                         "auto_archive_deletions": self.auto_archive_deletions}
+            profiles = [p for p in self.sync_profiles if p["account"] != remote]
+            profiles.append(candidate)
+            normalized = validate_profiles(profiles)
+            self.sync_profiles = normalized
+            self.profiles_configured = True
+            self.persist()
+            self.update_profiles_ui()
+            self.notice("Perfil salvo, sem mover nem excluir arquivos.", "success")
+        except (OSError, ValueError) as exc:
+            self.notice("Erro ao configurar perfil: " + str(exc), "warning")
+
+    def remove_sync_profile(self, *_):
+        if self.auto_enabled:
+            self.notice("Pause a sincronização antes de remover perfis.", "warning")
+            return
+        selected = self.profile_list.get_selected_row()
+        if selected is None:
+            self.notice("Selecione um perfil para remover.", "warning")
+            return
+        index = selected.profile_index
+        self.sync_profiles = [p for i,p in enumerate(self.sync_profiles) if i != index]
+        self.profiles_configured = True
+        self.persist()
+        self.update_profiles_ui()
+        self.notice("Perfil desativado; nenhum arquivo foi apagado.", "success")
+
     def save_sync_filters(self, *_):
         try:
             includes = parse_entry(self.include_entry.get_text())
