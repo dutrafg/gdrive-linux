@@ -4,7 +4,7 @@ Cliente desktop experimental **GTK4 + rclone** para Google Drive em Linux. **Ver
 
 ## Interface
 
-A navegação foi redesenhada para o estilo de aplicativo Linux corporativo: sidebar azul-escuro, conteúdo claro, cartões responsivos, botões por prioridade, estados visuais e ícones do sistema.
+A navegação foi redesenhada para o estilo de aplicativo Linux corporativo: sidebar azul-escuro, conteúdo claro, cartões responsivos, botões que se reorganizam em janelas estreitas, foco visível para navegação por teclado, estados visuais e ícones do sistema.
 
 - **Início:** conta ativa, pasta local, situação da sincronização e última transferência (dados reais da sessão).
 - **Contas:** selecionar conta, iniciar o assistente Google, escolher, abrir ou criar a pasta local `~/GoogleDrive`.
