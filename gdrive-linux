@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 import gi
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk, GLib, Gio
+from gi.repository import Gtk, GLib, Gio, Gdk
 from rclone_backend import list_remotes, copy_command, list_files, search_files
 from settings import load_settings, save_settings
 from progress import parse_progress
@@ -657,6 +657,8 @@ class DriveWindow(Gtk.ApplicationWindow):
             "drive-muted", wrap=True)
         self.mount_preflight_text.set_selectable(True)
         diagnosis.append(self.mount_preflight_text)
+        diagnosis.append(action("Copiar diagnóstico sem dados confidenciais",
+                                self.copy_mount_diagnosis, "edit-copy-symbolic"))
         page.append(intro)
         page.append(diagnosis)
         hints = card("Requisitos no Zorin OS",
@@ -982,6 +984,16 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.docs_export_status.set_text(message)
         self.notice(message, "success" if success else "error")
         return False
+
+    def copy_mount_diagnosis(self, *_):
+        try:
+            display = Gdk.Display.get_default()
+            if display is None:
+                raise RuntimeError("Área de transferência indisponível.")
+            display.get_clipboard().set_text(self.mount_preflight_text.get_text())
+            self.notice("Diagnóstico resumido copiado sem tokens OAuth.", "success")
+        except (OSError, RuntimeError, GLib.Error) as exc:
+            self.notice("Não foi possível copiar diagnóstico: " + str(exc), "warning")
 
     def check_mount_preflight(self, *_):
         remote = self.selected_remote()
