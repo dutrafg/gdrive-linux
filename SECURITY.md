@@ -66,3 +66,14 @@ Use uma conta e pasta de testes, confirme origem e destino, mantenha backup sepa
 - A preferência de exclusão automática fica desativada por padrão. A ativação exige confirmação gráfica. Quando habilitada, apenas a cópia **cujo hash ainda coincide com o histórico** pode ser movida para um arquivo recuperável, nunca apagada definitivamente. Exclusões e renomeações concorrentes ainda podem resultar em conflitos; restauração é manual.
 - O disco virtual começa somente leitura. Habilitar gravação exige ação explícita e **remontagem**, com aviso sobre cache VFS e riscos de gravação pendente. Confirme que a API tem quota antes de editar arquivos grandes. Exclusões via rclone mount usam o comportamento padrão do Google Drive (envio para lixeira), mas não substituem backups independentes.
 - O serviço systemd é revalidado na abertura do aplicativo quando o usuário já tinha ativado o recurso. Persistência da preferência não significa que uma transferência específica ocorreu; verificar timer e último estado para diagnosticar.
+
+## Perfis e integrações adicionais (v0.14.0)
+
+- Montagem automática é opt-in e usa **systemd do usuário** no login, sem execução como root nem `loginctl enable-linger`; o tipo `notify` aguarda confirmação real de montagem. A recuperação de falhas pode fazer novas tentativas, mas não contorna cota Google 403.
+- Cada conta/pasta tem histórico e bloqueio exclusivos. Não permita perfis com diretórios iguais ou aninhados, nem o diretório FUSE como destino do próprio espelhamento. Discos externos não montados em `/media`/`/run/media` interrompem o perfil antes de escrever arquivos.
+- Filtros são aplicados aos inventários locais e remotos antes de calcular conflitos/exclusões. Arquivos que saem da seleção não são tratados como excluídos. O estado anterior dos arquivos excluídos pelo filtro permanece conservado, evitando arquivamento inesperado.
+- Sincronização unidirecional recusa sobrescritas conflitantes, nunca usa `rclone sync` destrutivo. Modos somente envio/download não reconciliam exclusões automaticamente.
+- O indicador da bandeja usa um **processo GTK3 independente** opcional; não mostra tokens, caminhos detalhados nem dados de arquivos e não deve armazenar credenciais. O controle de inicialização grava somente um atalho gerenciado em `~/.config/autostart`.
+- A integração com Zorin Files só altera o favorito específico de `~/DriveOnline/<conta>` no arquivo de bookmarks GTK, preservando os demais favoritos. Não executa ações de nuvem.
+- A exportação de documentos copia arquivos ao disco fora do espelhamento, valida o backend Drive, limita o tipo de formato e não faz upload, exclusões nem conversão reversa. Revise o conteúdo exportado antes de compartilhar cópias locais.
+- A compatibilidade plena com Google Drive para Windows, presença Office, Google Photos integral, permissões de unidades compartilhadas e integração nativa de ícones por arquivo permanece não garantida.
