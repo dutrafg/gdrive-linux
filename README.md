@@ -1,16 +1,26 @@
-# Drive para Linux
+# Drive para Linux (GTK4)
 
-Cliente gráfico simples GTK3 para Google Drive baseado em rclone.
+Cliente gráfico simples para Google Drive, usando **rclone** como motor de transferência.
 
 ## Dependências
-`sudo apt install python3 python3-gi gir1.2-gtk-3.0 rclone`
+```bash
+sudo apt install python3 python3-gi gir1.2-gtk-4.0 rclone
+```
 
 ## Executar
-`python3 gdrive-linux`
+```bash
+python3 gdrive-linux
+```
 
-Configure a conta usando `rclone config` no terminal, depois atualize as contas no aplicativo.
+Configure a conta pelo botão **Configurar** ou com `rclone config`.
 
-A versão 0.1.0 usa `rclone copy`, que não exclui arquivos no destino. Não é sincronização bidirecional. O aplicativo usa as credenciais armazenadas pelo rclone; não envie `rclone.conf` ao GitHub.
+## Recursos atuais (0.2.0 Alpha)
+- Seleção de conta configurada no rclone
+- Seleção de pasta local
+- Enviar e baixar usando `rclone copy`
+- Logs e cancelamento
 
-## Atualizações
-Novas versões serão publicadas em GitHub Releases; verificação e instalação pelo aplicativo são funcionalidades futuras.
+**Atenção:** `copy` não exclui arquivos do destino, mas pode substituir arquivos de mesmo nome. Ainda não existe sincronização bidirecional, montagem de unidade virtual ou atualização automática instalada. Faça backup antes de testar com dados importantes. Não publique seu `rclone.conf`.
+
+## Pacote Debian
+O workflow do GitHub Actions cria um artefato `.deb` para instalação. A compilação do pacote não substitui testes funcionais reais em GNOME/KDE.
