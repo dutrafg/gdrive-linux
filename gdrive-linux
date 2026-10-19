@@ -11,8 +11,9 @@ from rclone_backend import list_remotes, copy_command, list_files
 from settings import load_settings, save_settings
 from progress import parse_progress
 from google_oauth import google_config_command
+from sync_plan import local_inventory, remote_inventory, conservative_plan
 
-VERSION = "0.9.8"
+VERSION = "0.9.9"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -95,6 +96,9 @@ class DriveWindow(Gtk.ApplicationWindow):
         note.set_wrap(True)
         note.set_xalign(0)
         accounts_page.append(note)
+        preview = Gtk.Button(label="Simular sincronização bidirecional")
+        preview.connect("clicked", self.preview_sync)
+        accounts_page.append(preview)
 
         actions = Gtk.Box(spacing=8)
         accounts_page.append(actions)
@@ -267,6 +271,30 @@ class DriveWindow(Gtk.ApplicationWindow):
             d.destroy()
         dialog.connect("response", response)
         dialog.show()
+
+    def preview_sync(self, *_):
+        remote = self.selected_remote()
+        if not remote or not self.folder.is_dir():
+            self.status.set_text("Selecione uma conta e pasta local existente.")
+            return
+        self.status.set_text("Comparando arquivos sem transferir ou excluir nada…")
+        threading.Thread(target=self.preview_sync_worker,
+                         args=(remote, self.folder), daemon=True).start()
+
+    def preview_sync_worker(self, remote, folder):
+        try:
+            local = local_inventory(folder)
+            cloud = remote_inventory(remote)
+            plan = conservative_plan(local, cloud)
+            message = ("Simulação: " + str(len(plan.download)) + " para baixar, " +
+                       str(len(plan.upload)) + " para enviar, " +
+                       str(len(plan.conflicts)) + " conflitos. Nenhuma alteração feita.")
+            GLib.idle_add(self.status.set_text, message)
+            GLib.idle_add(self.append, message)
+            for name in plan.conflicts[:30]:
+                GLib.idle_add(self.append, "Conflito (sem alterações): " + name)
+        except (OSError, ValueError, subprocess.SubprocessError) as exc:
+            GLib.idle_add(self.status.set_text, "Simulação falhou: " + str(exc))
 
     def open_local_folder(self, *_):
         try:
