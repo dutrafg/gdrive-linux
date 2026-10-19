@@ -24,6 +24,12 @@ def clean_remote_label(value):
     label = "".join(c for c in value if c.isprintable() and c not in "/\\")
     return label[:45] or "conta desconhecida"
 
+def nonnegative_count(value):
+    try:
+        return max(0, int(value))
+    except (ValueError, TypeError, OverflowError):
+        return 0
+
 def profile_lines(state, max_profiles=4):
     """Summarize at most a few accounts to avoid GTK label overflow."""
     if not isinstance(state, dict):
@@ -38,8 +44,8 @@ def profile_lines(state, max_profiles=4):
         name = clean_remote_label(item.get("account"))
         mode = MODES.get(item.get("mode"), "")
         title = LABELS.get(item.get("state"), "Estado desconhecido")
-        copied = max(0, int(item.get("copied", 0) or 0))
-        pending = max(0, int(item.get("pending", 0) or 0))
+        copied = nonnegative_count(item.get("copied"))
+        pending = nonnegative_count(item.get("pending"))
         summary = name + ": " + title
         if mode:
             summary += " (" + mode + ")"
