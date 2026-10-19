@@ -446,54 +446,137 @@ class DriveWindow(Gtk.ApplicationWindow):
         return True
 
     def connect_google(self, *_):
-        dialog = Gtk.Window(title="Conectar Google Drive", transient_for=self, modal=True)
-        dialog.set_default_size(440, 240)
-        panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        panel.set_margin_top(18)
-        panel.set_margin_bottom(18)
-        panel.set_margin_start(18)
-        panel.set_margin_end(18)
+        """Native GTK wizard; rclone performs OAuth in the system browser."""
+        dialog = Gtk.Window(title="Conectar conta Google Drive",
+                            transient_for=self, modal=True)
+        dialog.set_default_size(580, 430)
+        dialog.add_css_class("drive-dialog")
+        panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        panel.set_margin_top(24)
+        panel.set_margin_bottom(24)
+        panel.set_margin_start(28)
+        panel.set_margin_end(28)
         dialog.set_child(panel)
-        info = Gtk.Label(label="Crie um cliente OAuth do tipo Desktop no Google Cloud. A autorização será aberta pelo rclone no navegador.")
-        info.set_wrap(True)
-        panel.append(info)
+        title = Gtk.Label(label="Conectar conta Google Drive")
+        title.add_css_class("title-2")
+        title.set_xalign(0)
+        panel.append(title)
+        desc = Gtk.Label(label="O rclone autoriza o acesso pelo navegador. Sua senha nunca é informada ao aplicativo.")
+        desc.set_wrap(True)
+        desc.set_xalign(0)
+        panel.append(desc)
+        steps = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        panel.append(steps)
+        step_labels = []
+        for label in ("1  Preparar", "2  Autorizar", "3  Verificar", "4  Concluído"):
+            item = Gtk.Label(label=label)
+            item.add_css_class("drive-step")
+            item.set_hexpand(True)
+            steps.append(item)
+            step_labels.append(item)
+        wizard = Gtk.Stack()
+        wizard.set_vexpand(True)
+        panel.append(wizard)
+        start_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        start_page.add_css_class("drive-wizard-head")
+        start_page.append(Gtk.Label(label="Passo 1: preparar conexão"))
         name = Gtk.Entry()
-        name.set_placeholder_text("Nome da conta (ex.: meu_drive)")
-        panel.append(name)
-        client = Gtk.Entry()
-        client.set_placeholder_text("Client ID (*.apps.googleusercontent.com)")
-        panel.append(client)
-        action = Gtk.Button(label="Autorizar no navegador")
-        panel.append(action)
-        def start(_button):
+        name.set_placeholder_text("Nome da conta (ex.: pessoal)")
+        name.set_text("meu_drive")
+        start_page.append(name)
+        optional = Gtk.Entry()
+        optional.set_placeholder_text("Client ID próprio (opcional)")
+        start_page.append(optional)
+        hint = Gtk.Label(label="Você pode deixar o Client ID vazio e usar o cliente padrão do rclone.")
+        hint.set_wrap(True)
+        start_page.append(hint)
+        wizard.add_named(start_page, "start")
+        waiting = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        waiting.add_css_class("drive-wizard-head")
+        waiting.append(Gtk.Label(label="Passo 2: autorizar no navegador"))
+        waiting_info = Gtk.Label(label="Aguardando autorização do Google. Selecione sua conta no navegador que abrir.")
+        waiting_info.set_wrap(True)
+        waiting.append(waiting_info)
+        spinner = Gtk.Spinner()
+        spinner.set_spinning(True)
+        waiting.append(spinner)
+        wizard.add_named(waiting, "waiting")
+        finished = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        finished.add_css_class("drive-wizard-head")
+        result_label = Gtk.Label(label="")
+        result_label.set_wrap(True)
+        finished.append(result_label)
+        wizard.add_named(finished, "finished")
+        buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        panel.append(buttons)
+        cancel = Gtk.Button(label="Fechar")
+        cancel.connect("clicked", lambda *_: dialog.close())
+        buttons.append(cancel)
+        action = Gtk.Button(label="Iniciar autorização")
+        action.add_css_class("drive-connect")
+        action.set_hexpand(True)
+        buttons.append(action)
+
+        def show_step(index):
+            for pos, label in enumerate(step_labels):
+                label.remove_css_class("drive-step-active")
+                if pos == index:
+                    label.add_css_class("drive-step-active")
+
+        def begin(_button):
             try:
-                command = google_config_command(name.get_text().strip(), client.get_text().strip())
+                command = google_config_command(name.get_text().strip(), optional.get_text().strip())
             except ValueError as exc:
-                info.set_text(str(exc))
+                hint.set_text(str(exc))
                 return
-            dialog.close()
-            self.status.set_text("Aguardando autorização Google no navegador…")
-            threading.Thread(target=self.google_auth_worker, args=(command,), daemon=True).start()
-        action.connect("clicked", start)
+            action.set_sensitive(False)
+            name.set_sensitive(False)
+            wizard.set_visible_child_name("waiting")
+            show_step(1)
+            self.status.set_text("Aguardando autorização no navegador…")
+            threading.Thread(target=self.google_auth_worker,
+                             args=(command, dialog, wizard, result_label, show_step, action),
+                             daemon=True).start()
+
+        action.connect("clicked", begin)
+        show_step(0)
+        wizard.set_visible_child_name("start")
         dialog.present()
 
-    def google_auth_worker(self, command):
+    def google_auth_worker(self, command, dialog, wizard, result_label, show_step, action):
+        """Do not capture or display OAuth token-bearing rclone output."""
         try:
-            # Prevent overwriting an existing rclone remote and its OAuth tokens.
             if command[3] in list_remotes():
-                GLib.idle_add(self.status.set_text, "Essa conta já existe no rclone. Escolha outro nome.")
-                return
-            result = subprocess.run(command, stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.DEVNULL, timeout=240)
-            if result.returncode:
-                GLib.idle_add(self.status.set_text, "Autorização não concluída. Confira o navegador e a configuração OAuth.")
+                message = "Essa conta já existe. Feche a janela e escolha outro nome."
+                success = False
             else:
-                GLib.idle_add(self.refresh)
-                GLib.idle_add(self.status.set_text, "Conta criada. Selecione-a em Contas.")
+                result = subprocess.run(command, stdout=subprocess.DEVNULL,
+                                        stderr=subprocess.DEVNULL, timeout=300)
+                success = result.returncode == 0
+                if success:
+                    # Verify the remote exists before showing success to the user.
+                    success = command[3] in list_remotes()
+                message = ("Conta conectada! Atualize a lista e escolha sua conta."
+                           if success else
+                           "A autorização não foi concluída. Verifique o navegador e tente novamente.")
         except subprocess.TimeoutExpired:
-            GLib.idle_add(self.status.set_text, "Tempo limite de autorização atingido.")
-        except (OSError, subprocess.SubprocessError) as exc:
-            GLib.idle_add(self.status.set_text, "Falha ao iniciar autorização pelo rclone.")
+            success, message = False, "Tempo de autorização esgotado. Tente novamente."
+        except (OSError, subprocess.SubprocessError):
+            success, message = False, "O rclone não iniciou. Verifique se está instalado."
+        GLib.idle_add(self.complete_google_auth, dialog, wizard, result_label,
+                      show_step, action, success, message)
+
+    def complete_google_auth(self, dialog, wizard, label, show_step, action, success, message):
+        if not dialog.get_visible():
+            return False
+        wizard.set_visible_child_name("finished")
+        show_step(3 if success else 2)
+        label.set_text(message)
+        action.set_visible(False)
+        self.status.set_text(message)
+        if success:
+            self.refresh()
+        return False
 
     def configure(self, *_):
         try:
