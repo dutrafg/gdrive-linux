@@ -1,6 +1,6 @@
 # Drive para Linux
 
-Cliente desktop experimental **GTK4 + rclone** para Google Drive em Linux. **Versão 0.13.0 Alpha**. Projeto independente, não oficial do Google.
+Cliente desktop experimental **GTK4 + rclone** para Google Drive em Linux. **Versão 0.13.1 Alpha**. Projeto independente, não oficial do Google.
 
 ## Interface
 
@@ -18,10 +18,10 @@ A consulta de nomes/pastas não aparece como transferência em andamento. Os bot
 
 ## Instalação no Zorin OS, Ubuntu e Debian
 
-Baixe o artefato aprovado na página de [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions), extraia o ZIP e instale o `gdrive-linux_0.13.0_all.deb`:
+Baixe o artefato aprovado na página de [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions), extraia o ZIP e instale o `gdrive-linux_0.13.1_all.deb`:
 
 ```bash
-sudo apt install ./gdrive-linux_0.13.0_all.deb
+sudo apt install ./gdrive-linux_0.13.1_all.deb
 ```
 
 O pacote requer Python 3, PyGObject e GTK4. A dependência `rclone` é **recomendada**, para permitir que a interface seja instalada mesmo quando o Zorin não oferece esse pacote nas fontes configuradas. **Sem o rclone, conexão e transferência não funcionam.** Confirme com `rclone version`; instruções oficiais: https://rclone.org/install/ .
@@ -32,18 +32,18 @@ Para iniciar diretamente a partir do código-fonte, instale Python 3, GTK4 e rcl
 
 Abra **Início → Conectar Google**. Informe o nome da conta e clique em **Iniciar autorização**. O GTK4 acompanha o procedimento, enquanto o **rclone abre o navegador padrão para a autorização OAuth**. O aplicativo não pede a senha Google e não mostra tokens.
 
-**Atenção (2026):** a documentação do rclone informa que o **Client ID Google compartilhado está sendo descontinuado durante 2026**. Portanto, a opção padrão pode deixar de funcionar; pode ser necessário cadastrar credenciais OAuth próprias. Consulte https://rclone.org/drive/#making-your-own-client-id . O campo Client ID na janela é opcional, mas algumas configurações próprias também exigem Client Secret; nesses casos, utilize **Configurações → Configuração avançada (terminal)** até essa etapa ser integrada com segurança. Não cole a senha Google no aplicativo.
+**Atenção (2026):** a documentação do rclone informa que o **Client ID Google compartilhado está sendo descontinuado durante 2026**. No teste Zorin, o Google respondeu **403 RATE_LIMIT_EXCEEDED (userQueriesPerMinutePerProject)**; nesse caso, é necessário configurar credenciais OAuth próprias, não apenas repetir transferências. Consulte https://rclone.org/drive/#making-your-own-client-id . O campo Client ID na janela é opcional, mas algumas configurações próprias também exigem Client Secret; nesses casos, utilize **Configurações → Configuração avançada (terminal)** até essa etapa ser integrada com segurança. Não cole a senha Google no aplicativo.
 
 O assistente GUI e a abertura do navegador são automatizados, mas a autenticação real com uma conta Google **ainda requer homologação em Zorin OS**.
 
 ## Integridade dos dados
 
 - **Download/upload manual:** usa `rclone copy`; não exclui arquivos mas **pode sobrescrever arquivos existentes**.
-- **Sincronização automática contínua:** usa `background_sync.py` via `gdrive-linux-sync.timer` do systemd por usuário, com inventários MD5 e histórico local de estado. Ao editar arquivo de apenas um lado, o aplicativo atualiza o outro, com backup da versão anterior. Criações locais e remotas são transferidas. A janela pode ser fechada e o timer continua durante a sessão Linux. É necessário ativar uma vez em **Sincronização**; pode-se pausar pelo mesmo botão. A mudança de exclusão/renomeação não é propagada automaticamente.
+- **Sincronização automática contínua:** usa `background_sync.py` via `gdrive-linux-sync.timer` do systemd por usuário, com inventários MD5 e histórico local de estado. Ao editar arquivo de apenas um lado, o aplicativo atualiza o outro, com backup da versão anterior. Criações locais e remotas são transferidas. A janela pode ser fechada e o timer continua durante a sessão Linux. É necessário ativar uma vez em **Sincronização**; pode-se pausar pelo mesmo botão. A propagação de exclusões é opcional: **Sincronização → Conciliar exclusões automaticamente com backup recuperável**, desativada por padrão e exige confirmação. Renomeações são analisadas como exclusão e arquivo novo, não são detectadas como um evento atômico.
 - **Transferência seletiva:** usa `rclone copyto --ignore-existing`, sem exclusão nem sobrescrita intencional; compara inventários, conserva conflitos e limita lotes.
 - **Simulação:** mostra diferenças e até 50 conflitos, mas não altera arquivos.
 
-Ainda não há propagação automática de exclusões/renomeações, resolução de conflitos simultâneos, montagem FUSE (streaming virtual) ou sincronização enquanto o usuário está desconectado da sessão Linux. Faça backup separado antes de copiar dados importantes.
+Exclusões podem ser conciliadas **somente com opt-in e arquivamento recuperável**. Não há resolução automática de conflitos simultâneos, detecção atômica de renomeações nem sincronização após logout do Linux. Faça backup separado antes de copiar dados importantes.
 
 Preferências: `~/.config/gdrive-linux/settings.json`. Tokens OAuth são gerenciados pelo rclone em sua própria configuração. Nunca publique o arquivo `rclone.conf`.
 
@@ -55,13 +55,13 @@ O smoke GTK4 não equivale a avaliação visual humana nem a autenticação Goog
 
 ## Versionamento
 
-Até a v0.13.0, o aplicativo permanece **Alpha**. A promoção para uma versão pré-estável ou Beta depende de QA, especialmente autenticação com conta Google, compatibilidade em Zorin OS e confiabilidade de cópias.
+Até a v0.13.1, o aplicativo permanece **Alpha**. A promoção para uma versão pré-estável ou Beta depende de QA, especialmente autenticação com conta Google, compatibilidade em Zorin OS e confiabilidade de cópias.
 
 ## Identificação da conta no Zorin OS
 
 A lista de contas do rclone apresenta nomes remotos como `meu_drive`; esse nome não é necessariamente o endereço Gmail. Em **Contas**, veja **Conta selecionada**, escolha um nome/e-mail de referência local opcional e clique em **Salvar identificação**. O texto será armazenado nas preferências locais, mas **não constitui verificação da identidade Google**. Para verificar se o acesso está operacional, use **Verificar acesso à conta**; a aplicação testa a conexão com o rclone sem mostrar credenciais.
 
-O botão **Simular** consulta inventários sem transferir dados. **Atualização automática ativada** significa agendamento de verificações a cada 5 minutos enquanto o aplicativo está aberto, e não que exista um download em curso naquele momento.
+O botão **Simular** consulta inventários sem transferir dados. **Sincronização contínua ativada** significa um timer systemd que executa ciclos aproximadamente a cada minuto, inclusive com a janela fechada, e não que exista um download em curso naquele momento.
 
 ## Configurar sincronização contínua no Zorin OS
 
@@ -106,3 +106,28 @@ O envio é **manual e não destrutivo**. Ele usa `rclone copy --ignore-existing`
 Arquivos que desapareceram somente de um lado continuam classificados como conflito por segurança. Na página **Sincronização → Revisar exclusões com arquivamento recuperável**, escolha um único arquivo e confirme. A cópia remanescente será **movida para um arquivo de recuperação**: cópia local em `~/.local/share/gdrive-linux/backups` ou cópia remota em `.gdrive-linux-history/archived-deletions`, conforme o lado que sofreu a exclusão.
 
 Não existe exclusão automática destrutiva. Renomeações são atualmente tratadas como exclusão + novo arquivo e podem exigir revisão manual. Após arquivar, os dados permanecem recuperáveis. Não modifique a estrutura dos históricos internos e mantenha backup externo separado.
+
+## Correções do teste no Zorin OS — v0.13.1 Alpha
+
+### Erro 403 RATE_LIMIT_EXCEEDED
+
+As capturas mostram o projeto OAuth compartilhado do rclone bloqueado por limite de `userQueriesPerMinutePerProject`. O programa agora usa `--tpslimit 2 --tpslimit-burst 2`, reduz a concorrência, exibe orientação legível e faz uma pausa de **15 minutos** após erro de cota detectado no serviço contínuo. Isso reduz o número de solicitações, mas **não repara uma cota compartilhada já bloqueada**.
+
+Em **Contas → Corrigir bloqueio Google 403 (Client ID próprio)**, abra a documentação oficial, configure um **Client ID e Client Secret OAuth Desktop** no seu projeto do Google Cloud, habilite a API Google Drive, edite o remoto atual no `rclone config` e reautorize pelo navegador. Não precisa excluir a pasta espelhada nem recriar os seus arquivos. Não cole Client Secret ou tokens em mensagens, capturas ou repositórios. O campo Client ID da conexão inicial não substitui a configuração completa de Client Secret.
+
+### Criar, modificar e excluir arquivos
+
+Existem **duas pastas diferentes**:
+
+- **Pasta espelhada local**, por exemplo `~/GoogleDrive`: é uma pasta comum do Linux e deve ser gravável pelo próprio usuário. Criações e edições locais passam à nuvem pelo timer quando houver acesso à API. Se o Zorin negar gravação já nessa pasta, confira as permissões no gerenciador de arquivos; não altere proprietário/permissões de todo o HOME.
+- **Disco virtual online**, por exemplo `~/DriveOnline/meu_drive`: é uma montagem rclone FUSE e começa **somente leitura**, por segurança. Para criar, editar, renomear e excluir diretamente no Drive, vá a **Disco virtual**, marque **Permitir modificar arquivos**, feche os documentos abertos e clique em **Aplicar gravação e remontar Drive**. A permissão será aplicada após reiniciar a montagem. No Drive, o rclone normalmente usa a lixeira para exclusões, mas mantenha backups de arquivos importantes.
+
+Se você apagar um arquivo **da pasta espelhada** e quiser refletir a exclusão na nuvem, ative **Conciliar exclusões automaticamente com backup recuperável** (opt-in). O outro arquivo não será apagado definitivamente: será movido ao histórico de recuperação. O sentido inverso funciona da mesma forma. Edições simultâneas permanecem conflitos para revisão.
+
+### Arquivos em quantidade grande
+
+A sincronização contínua processa **até 100 arquivos por ciclo** e registra quantos estão pendentes. Uma fila de 562 arquivos não exige transferências manuais: após a recuperação da API, os ciclos seguintes continuarão o trabalho automaticamente. Os comandos manuais seletivos mantêm um limite conservador de lote.
+
+### Verificar a execução
+
+Em **Configurações → Diagnóstico de compatibilidade Zorin OS**, confirme a pasta gravável, a conta autorizada, FUSE e o timer. O botão para ativar a sincronização agora solicita o primeiro ciclo imediatamente, e **Ver status do serviço** avisa se o timer real do Linux não está ativo. Mesmo com timer ativo, **um erro 403 impede transferir** até a API aceitar novamente.
