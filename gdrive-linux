@@ -283,7 +283,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         toolbar.append(action("Atualizar", self.browse, "view-refresh-symbolic"))
         files_card.append(toolbar)
         search_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        self.search_entry = Gtk.SearchEntry()
+        self.search_entry = Gtk.Entry()
         self.search_entry.set_placeholder_text("Buscar arquivos nesta conta Google")
         self.search_entry.set_hexpand(True)
         self.search_entry.connect("activate", self.search_remote)
