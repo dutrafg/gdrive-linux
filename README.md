@@ -1,6 +1,6 @@
 # Drive para Linux
 
-Cliente desktop experimental **GTK4 + rclone** para Google Drive em Linux. **Versão 0.14.2 Alpha**. Projeto independente, não oficial do Google.
+Cliente desktop experimental **GTK4 + rclone** para Google Drive em Linux. **Versão 0.14.3 Alpha**. Projeto independente, não oficial do Google.
 
 ## Interface
 
@@ -18,7 +18,7 @@ A consulta de nomes/pastas não aparece como transferência em andamento. Os bot
 
 ## Instalação no Zorin OS, Ubuntu e Debian
 
-Baixe o artefato aprovado na página de [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions), extraia o ZIP e instale o `gdrive-linux_0.14.2_all.deb`:
+Baixe o artefato aprovado na página de [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions), extraia o ZIP e instale o `gdrive-linux_0.14.3_all.deb`:
 
 ```bash
 sudo apt install ./gdrive-linux_0.13.1_all.deb
@@ -55,7 +55,7 @@ O smoke GTK4 não equivale a avaliação visual humana nem a autenticação Goog
 
 ## Versionamento
 
-Até a v0.14.2, o aplicativo permanece **Alpha**. A promoção para uma versão pré-estável ou Beta depende de QA, especialmente autenticação com conta Google, compatibilidade em Zorin OS e confiabilidade de cópias.
+Até a v0.14.3, o aplicativo permanece **Alpha**. A promoção para uma versão pré-estável ou Beta depende de QA, especialmente autenticação com conta Google, compatibilidade em Zorin OS e confiabilidade de cópias.
 
 ## Identificação da conta no Zorin OS
 
@@ -132,7 +132,7 @@ A sincronização contínua processa **até 100 arquivos por ciclo** e registra 
 
 Em **Configurações → Diagnóstico de compatibilidade Zorin OS**, confirme a pasta gravável, a conta autorizada, FUSE e o timer. O botão para ativar a sincronização agora solicita o primeiro ciclo imediatamente, e **Ver status do serviço** avisa se o timer real do Linux não está ativo. Mesmo com timer ativo, **um erro 403 impede transferir** até a API aceitar novamente.
 
-## Prioridades alta e média inspiradas no Insync — v0.14.2 Alpha
+## Prioridades alta e média inspiradas no Insync — v0.14.3 Alpha
 
 ### Inicialização automática do disco virtual
 Em **Disco virtual**, ative **Montar Drive automaticamente ao entrar no Linux**. O aplicativo usa `systemctl --user enable gdrive-linux-mount.service` e solicita a montagem atual de forma assíncrona. O serviço foi configurado com `Type=notify`, ou seja, não deve anunciar a montagem como pronta antes do rclone confirmar o FUSE. Ao entrar novamente no Zorin OS, a montagem será solicitada automaticamente, mesmo sem abrir a janela GTK4. O serviço exige sessão de usuário Linux, FUSE e conectividade; se a rede falhar tentará novamente com intervalo conservador. Desativar o controle também solicita a desmontagem da unidade atual.
@@ -163,7 +163,7 @@ Na nova seção **Documentos Google**, exporte cópias em **LibreOffice/ODF**, *
 O QA no Ubuntu/Wayland e os testes do rclone com remotos locais são obrigatórios antes da entrega. **Ainda dependem do Zorin OS real**: autorização OAuth do Google, montagem FUSE após login, suporte do painel ao AppIndicator, acesso a arquivos compartilhados com permissões específicas, e exportação de documentos nativos reais. O software permanece Alpha enquanto esses cenários não forem confirmados.
 
 
-## Correções da montagem no Zorin OS — v0.14.2 Alpha
+## Correções da montagem no Zorin OS — v0.14.3 Alpha
 
 Esta atualização responde ao erro **“Não foi possível montar”** que apareceu no teste. A montagem continua usando rclone/FUSE e `systemd --user` com `Type=notify`, como recomendado pelo rclone. Os ajustes incluem:
 
@@ -194,7 +194,7 @@ Para verificar o serviço manualmente: `systemctl --user status gdrive-linux-mou
 
 **Limites da validação:** os testes automatizados confirmam a estrutura do serviço, segurança, diagnósticos e inicialização GTK4; o teste FUSE com um remoto local só executa quando o runner oferece `/dev/fuse`. A montagem real do Google Drive e o funcionamento após login no Zorin continuam necessitando teste no computador.
 
-## Melhorias da v0.14.2 Alpha — montagem e segurança no Zorin OS
+## Melhorias da v0.14.3 Alpha — montagem e segurança no Zorin OS
 
 O pacote Debian agora instala rclone e fuse3 como dependências obrigatórias. A montagem recusa mudança de conta durante uma operação FUSE, pastas simbólicas e pontos sem permissão. O cache do rclone tem endereço previsível dentro da pasta pessoal; uma configuração RCLONE_CONFIG personalizada é respeitada na execução local, e o diagnóstico alerta quando o serviço de usuário pode não herdá-la.
 
@@ -203,3 +203,17 @@ O serviço aguarda até 180 segundos para iniciar e até 180 segundos para final
 Em Disco virtual, use Diagnosticar requisitos de montagem para verificar conta, executável, FUSE, permissões e systemd sem chamar a API Google. O botão Copiar diagnóstico sem dados confidenciais facilita suporte. Testar acesso Google é uma ação separada e explícita. Mesmo com FUSE montado, a API Google pode continuar bloqueada pelo erro 403 de quota.
 
 O indicador opcional de atividade só é habilitado se o suporte Ayatana/AppIndicator estiver disponível. Para várias contas, o indicador mostra a quantidade sem divulgar os nomes. O aplicativo ainda precisa de teste com a conta Google real no computador Zorin para homologação de montagem, autostart e gravação.
+
+## Revisão de integridade, configurações e QA — v0.14.3 Alpha
+
+Esta revisão segue a v0.14.2, com foco em confiabilidade e prevenção de informações incorretas na interface:
+
+- O serviço de sincronização agora retorna **falha ao systemd** em erros de API Google (incluindo 403) ou de acesso, em vez de registrar uma execução sem sucesso como se fosse concluída.
+- Quando uma fila contém mais arquivos que o limite por ciclo, a GUI informa **Sincronização parcial** e quantos arquivos aguardam a próxima execução. O indicador de sistema deixa de apresentar "Sincronizado" enquanto existir uma fila pendente.
+- Nos modos somente envio/download, arquivos deliberadamente não transferidos por causa da direção escolhida têm contagem separada, sem serem confundidos com pendências.
+- Em **Sincronização**, a interface apresenta o resultado de cada conta e avisa se a última verificação registrada ocorreu há mais de 15 minutos. Isso não prova que o timer está ativo; use o diagnóstico para conferir.
+- Os nomes de remotos do rclone agora rejeitam caracteres de controle e nomes iniciados por `-`, evitando interpretação de argumentos inválidos nos comandos.
+- O salvamento das preferências usa arquivos temporários exclusivos, gravação sincronizada e substituição atômica. Isso reduz risco de JSON corrompido quando atualizações de configuração ocorrem próximas umas das outras.
+- Foram adicionados testes específicos para erro de serviço, filas de múltiplos ciclos, modos unidirecionais, permissões de preferências, nomes de remotos e estados exibidos na interface.
+
+**Limitações mantidas:** autenticação OAuth real, montagem FUSE e criação/edição/exclusão de arquivos com sua conta Google precisam de testes no Zorin OS. Os testes em GitHub Actions usam ambientes Linux de CI e remotos locais do rclone; não equivalem a testes na conta Google pessoal.
