@@ -14,9 +14,12 @@ from google_oauth import google_config_command, verify_google_remote
 from sync_plan import local_inventory, remote_inventory, conservative_plan
 from safe_sync import execute_additions
 from background_sync import read_json, STATE_BASE
+from mount_drive import command as mount_command, mount_path, MOUNT_ROOT
+from photos_export import upload_media
+from desktop_files import find_openable_file
 from ui_kit import label, card, action, nav, format_size, section_title, row, button_flow
 
-VERSION = "0.12.0"
+VERSION = "0.13.0"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -43,6 +46,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.preferences = load_settings()
         self.auto_enabled = self.preferences.get("auto_sync_enabled", False) is True
         self.account_names = self.preferences.get("account_names", {})
+        self.mount_read_only = self.preferences.get("mount_read_only", True) is not False
+        self.search_mode = False
         self.folder = Path(self.preferences.get(
             "folder", str(Path.home() / "GoogleDrive"))).expanduser()
         self.remotes = Gtk.StringList.new([])
@@ -80,6 +85,8 @@ class DriveWindow(Gtk.ApplicationWindow):
             ("files", "Arquivos", "folder-symbolic"),
             ("sync", "Sincronização", "emblem-synchronizing-symbolic"),
             ("activity", "Transferências", "folder-download-symbolic"),
+            ("mount", "Disco virtual", "drive-harddisk-symbolic"),
+            ("photos", "Google Fotos", "camera-photo-symbolic"),
             ("history", "Histórico", "document-open-recent-symbolic"),
             ("settings", "Configurações", "emblem-system-symbolic"),
         )
@@ -130,6 +137,8 @@ class DriveWindow(Gtk.ApplicationWindow):
             "files": ("Arquivos", "Navegue pelos documentos no Google Drive."),
             "sync": ("Sincronização", "Compare e transfira arquivos novos com segurança."),
             "activity": ("Transferências", "Acompanhe o progresso e os registros do rclone."),
+            "mount": ("Disco virtual", "Abra seu Drive diretamente no gerenciador de arquivos."),
+            "photos": ("Google Fotos", "Envio opcional de fotos e vídeos para um álbum."),
             "history": ("Histórico", "Operações desta sessão do aplicativo."),
             "settings": ("Configurações", "Preferências, automação e diagnóstico."),
         }
@@ -175,6 +184,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.build_activity()
         self.build_history()
         self.build_settings()
+        self.build_mount()
+        self.build_photos()
 
     def build_home(self):
         home = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
@@ -444,7 +455,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         try:
             account = self.selected_remote() or ""
             save_settings(self.folder, account, self.account_names,
-                          self.auto_enabled)
+                          self.auto_enabled, self.mount_read_only)
             self.preferences["account"] = account
             self.preferences["folder"] = str(self.folder)
         except OSError as exc:
