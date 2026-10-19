@@ -16,6 +16,7 @@ from sync_plan import local_inventory, remote_inventory, conservative_plan
 from safe_sync import execute_additions
 from background_sync import read_json, STATE_BASE
 from mount_drive import command as mount_command, mount_path, MOUNT_ROOT
+from mount_health import mount_diagnosis, mount_ready, service_state, service_journal
 from photos_export import upload_media
 from desktop_files import find_openable_file
 from deletion_review import load_candidates, archive_deletion
@@ -23,7 +24,7 @@ from diagnostics import collect_diagnostics, format_report
 from rclone_errors import friendly, is_rate_limit
 from ui_kit import label, card, action, nav, format_size, section_title, row, button_flow
 
-VERSION = "0.13.1"
+VERSION = "0.13.2"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -515,7 +516,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         buttons = button_flow(start, stop, open_mount,
                               action("Aplicar gravação e remontar Drive",
                                      self.remount_drive, "view-refresh-symbolic", primary=True),
-                              action("Verificar requisitos FUSE",
+                              action("Diagnosticar erro de montagem",
                                      self.refresh_mount_status, "view-refresh-symbolic"))
         intro.append(buttons)
         page.append(intro)
@@ -713,21 +714,11 @@ class DriveWindow(Gtk.ApplicationWindow):
                          args=(target,), daemon=True).start()
 
     def mount_status_worker(self, target):
-        try:
-            result = subprocess.run(
-                ["systemctl", "--user", "is-active", "gdrive-linux-mount.service"],
-                capture_output=True, text=True, timeout=8)
-            active = result.returncode == 0
-            mounted = target.is_mount()
-            if active and mounted:
-                message = "Disco virtual montado e disponível no gerenciador."
-            elif active:
-                message = "Serviço em execução; aguardando FUSE montar o disco."
-            else:
-                message = "Disco virtual desmontado. Clique em Montar Drive."
-        except (OSError, subprocess.SubprocessError):
-            message = "Serviço systemd do usuário não está disponível."
+        # systemd may be active before the FUSE mount is ready; never imply
+        # mounted = true from the service state alone.
+        message = mount_diagnosis(target)
         GLib.idle_add(self.mount_status.set_text, message)
+        return False
 
     def start_mount(self, *_):
         if self.mount_busy:
@@ -746,7 +737,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             return
         self.mount_busy = True
         self.persist()
-        self.mount_status.set_text("Preparando montagem do Drive…")
+        self.mount_status.set_text("Preparando FUSE e aguardando confirmação do rclone. Isso pode levar até 2 minutos…")
         threading.Thread(target=self.mount_action_worker, args=("start", remote),
                          daemon=True).start()
 
@@ -773,7 +764,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             dialog.close()
             self.mount_busy = True
             self.persist()
-            self.mount_status.set_text("Remontando Drive com a nova permissão…")
+            self.mount_status.set_text("Remontando; aguardando confirmação real do sistema FUSE…")
             threading.Thread(target=self.mount_action_worker,
                              args=("restart", remote), daemon=True).start()
         panel.append(action("Confirmar e remontar", apply, primary=True))
@@ -789,31 +780,48 @@ class DriveWindow(Gtk.ApplicationWindow):
 
     def mount_action_worker(self, command, remote):
         success = False
+        message = "Não foi possível completar a operação."
         try:
+            service = "gdrive-linux-mount.service"
             reload = subprocess.run(
                 ["systemctl", "--user", "daemon-reload"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=12)
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
             if reload.returncode:
-                raise RuntimeError("Não foi possível atualizar serviços do usuário.")
-            res = subprocess.run(
-                ["systemctl", "--user", command, "gdrive-linux-mount.service"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=35)
-            success = res.returncode == 0
-            if success and command in ("start", "restart") and remote:
+                raise RuntimeError("systemd do usuário não conseguiu carregar o serviço.")
+            selected = command
+            if command == "start" and remote:
                 path = mount_path(remote)
-                for _ in range(12):
-                    if path.is_mount():
-                        break
-                    time.sleep(0.5)
-                success = path.is_mount()
-            message = ("Disco virtual pronto: " +
-                       ("somente leitura." if self.mount_read_only else
-                        "gravação, criação e exclusão habilitadas.")
-                       if success and command in ("start", "restart") else
-                       "Disco virtual desmontado." if success else
-                       "Não foi possível montar. Confira FUSE, rede e cota Google.")
+                if mount_ready(path):
+                    success = True
+                    message = "O disco já está montado e disponível."
+                elif service_state() == "active":
+                    # Recovery of a stale service that is active but has no FUSE mount.
+                    selected = "restart"
+            if not success:
+                response = subprocess.run(
+                    ["systemctl", "--user", selected, service],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    timeout=140)
+                if command == "stop":
+                    success = response.returncode == 0 and (
+                        not remote or not mount_ready(mount_path(remote)))
+                    message = ("Disco virtual desmontado." if success else
+                               "Não foi possível desmontar. Feche documentos abertos.")
+                else:
+                    path = mount_path(remote)
+                    success = response.returncode == 0 and mount_ready(path)
+                    if success:
+                        message = ("Disco virtual pronto: " +
+                                   ("somente leitura." if self.mount_read_only else
+                                    "gravação, criação e exclusão habilitadas."))
+                    else:
+                        message = mount_diagnosis(path, journal=service_journal())
+        except subprocess.TimeoutExpired:
+            message = ("O rclone demorou demais para montar. Confira FUSE, a conta "
+                       "e a cota da API; a operação pode continuar no systemd.")
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
-            message = "Falha no disco virtual: " + str(exc)
+            # Exceptions here are local systemd errors, not raw OAuth credentials.
+            message = "Erro ao controlar o serviço de montagem: " + str(exc)[:160]
         GLib.idle_add(self.mount_action_complete, success, message)
 
     def mount_action_complete(self, success, message):
