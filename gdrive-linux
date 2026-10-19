@@ -13,9 +13,10 @@ from progress import parse_progress
 from google_oauth import google_config_command, verify_google_remote
 from sync_plan import local_inventory, remote_inventory, conservative_plan
 from safe_sync import execute_additions
+from background_sync import read_json, STATE_BASE
 from ui_kit import label, card, action, nav, format_size, section_title, row, button_flow
 
-VERSION = "0.11.2"
+VERSION = "0.12.0"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -33,7 +34,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.refresh_generation = 0
         self.browse_generation = 0
         self.preview_generation = 0
-        self.auto_enabled = False
+        self.auto_enabled = self.preferences.get("auto_sync_enabled", False) is True
+        self.restoring_auto = False
         self.auto_generation = 0
         self.auto_interval_seconds = 300
         self.current_history = None
@@ -52,6 +54,10 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.build_pages()
         self.dropdown.connect("notify::selected", self.account_changed)
         self.navigate("home")
+        self.restoring_auto = True
+        self.auto_switch.set_active(self.auto_enabled)
+        self.restoring_auto = False
+        self.update_background_status()
         self.refresh()
 
     def build_shell(self):
@@ -422,7 +428,8 @@ class DriveWindow(Gtk.ApplicationWindow):
     def persist(self):
         try:
             account = self.selected_remote() or ""
-            save_settings(self.folder, account, self.account_names)
+            save_settings(self.folder, account, self.account_names,
+                          self.auto_enabled)
             self.preferences["account"] = account
             self.preferences["folder"] = str(self.folder)
         except OSError as exc:
