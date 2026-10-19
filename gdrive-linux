@@ -11,7 +11,7 @@ from rclone_backend import list_remotes, copy_command, list_files
 from settings import load_settings, save_settings
 from progress import parse_progress
 
-VERSION = "0.9.3"
+VERSION = "0.9.4"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
