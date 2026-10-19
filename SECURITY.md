@@ -102,3 +102,11 @@ Ainda são necessários backup independente, verificação de gravações penden
 - Uma conta com erro 403/quota ou falha operacional faz o serviço retornar código diferente de zero; um lote incompleto permanece claramente marcado como parcial.
 - Nenhum recurso novo desta versão propaga exclusões definitivas, remove caches FUSE ou altera permissões de pastas inteiras. Controles de exclusão recuperável continuam exigindo opt-in.
 - O status gráfico por conta omite nomes de arquivos, tokens, conteúdo de logs e caminhos completos; não é diagnóstico de OAuth real sem testar a conta.
+
+## Revisão v0.14.4 — preservação de dados
+
+- Falhas na verificação posterior não substituem o erro principal do processo rclone (incluindo 403) e não são ocultadas como sucesso.
+- Arquivamentos locais exigem correspondência entre MD5 atual e histórico; a revisão manual obedece aos filtros selecionados.
+- Itens sem hash comparável não são transferidos silenciosamente como se fossem arquivos comuns, evitando exportações ambíguas de documentos Google.
+- Montagens FUSE recusam locais cujo diretório pai não permite criar a unidade; nenhuma alteração recursiva de permissão ou remoção de cache é feita automaticamente.
+- Status e notificações são derivados do estado local, sem publicar tokens ou registrar nomes de arquivos nos avisos.
