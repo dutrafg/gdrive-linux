@@ -15,6 +15,18 @@ class SettingsTests(unittest.TestCase):
                 self.assertEqual(os.stat(settings.CONFIG_FILE).st_mode & 0o777, 0o600)
                 self.assertEqual(os.stat(directory).st_mode & 0o777, 0o700)
 
+    def test_account_display_names_roundtrip(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp) / "config"
+            with patch.object(settings, "CONFIG_DIR", directory), patch.object(
+                    settings, "CONFIG_FILE", directory / "settings.json"):
+                settings.save_settings("/tmp/drive", "pessoal",
+                                       {"pessoal": "Uso pessoal", "trabalho": "Trabalho"})
+                restored = settings.load_settings()
+                self.assertEqual(restored["account_names"]["pessoal"], "Uso pessoal")
+                self.assertEqual(restored["account_names"]["trabalho"], "Trabalho")
+                self.assertEqual(os.stat(settings.CONFIG_FILE).st_mode & 0o777, 0o600)
+
     def test_corrupt_settings(self):
         with tempfile.TemporaryDirectory() as temp:
             file = Path(temp) / "settings.json"
