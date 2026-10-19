@@ -1,6 +1,6 @@
 # Drive para Linux
 
-Cliente desktop experimental **GTK4 + rclone** para Google Drive em Linux. **Versão 0.13.1 Alpha**. Projeto independente, não oficial do Google.
+Cliente desktop experimental **GTK4 + rclone** para Google Drive em Linux. **Versão 0.14.0 Alpha**. Projeto independente, não oficial do Google.
 
 ## Interface
 
@@ -18,7 +18,7 @@ A consulta de nomes/pastas não aparece como transferência em andamento. Os bot
 
 ## Instalação no Zorin OS, Ubuntu e Debian
 
-Baixe o artefato aprovado na página de [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions), extraia o ZIP e instale o `gdrive-linux_0.13.1_all.deb`:
+Baixe o artefato aprovado na página de [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions), extraia o ZIP e instale o `gdrive-linux_0.14.0_all.deb`:
 
 ```bash
 sudo apt install ./gdrive-linux_0.13.1_all.deb
@@ -55,7 +55,7 @@ O smoke GTK4 não equivale a avaliação visual humana nem a autenticação Goog
 
 ## Versionamento
 
-Até a v0.13.1, o aplicativo permanece **Alpha**. A promoção para uma versão pré-estável ou Beta depende de QA, especialmente autenticação com conta Google, compatibilidade em Zorin OS e confiabilidade de cópias.
+Até a v0.14.0, o aplicativo permanece **Alpha**. A promoção para uma versão pré-estável ou Beta depende de QA, especialmente autenticação com conta Google, compatibilidade em Zorin OS e confiabilidade de cópias.
 
 ## Identificação da conta no Zorin OS
 
@@ -131,3 +131,33 @@ A sincronização contínua processa **até 100 arquivos por ciclo** e registra 
 ### Verificar a execução
 
 Em **Configurações → Diagnóstico de compatibilidade Zorin OS**, confirme a pasta gravável, a conta autorizada, FUSE e o timer. O botão para ativar a sincronização agora solicita o primeiro ciclo imediatamente, e **Ver status do serviço** avisa se o timer real do Linux não está ativo. Mesmo com timer ativo, **um erro 403 impede transferir** até a API aceitar novamente.
+
+## Prioridades alta e média inspiradas no Insync — v0.14.0 Alpha
+
+### Inicialização automática do disco virtual
+Em **Disco virtual**, ative **Montar Drive automaticamente ao entrar no Linux**. O aplicativo usa `systemctl --user enable gdrive-linux-mount.service` e solicita a montagem atual de forma assíncrona. O serviço foi configurado com `Type=notify`, ou seja, não deve anunciar a montagem como pronta antes do rclone confirmar o FUSE. Ao entrar novamente no Zorin OS, a montagem será solicitada automaticamente, mesmo sem abrir a janela GTK4. O serviço exige sessão de usuário Linux, FUSE e conectividade; se a rede falhar tentará novamente com intervalo conservador. Desativar o controle também solicita a desmontagem da unidade atual.
+
+### Sincronização seletiva e arquivos ignorados
+Em **Sincronização**, informe padrões separados por vírgula: em **Sincronizar somente** use, por exemplo, `Documentos/, Fotos/`; em **Ignorar**, `*.tmp, *.part, Cache/`. As regras são validadas, aplicadas nos **dois inventários antes de calcular as alterações** e persistidas. Retirar um diretório da seleção não causa exclusão de seu conteúdo — os hashes anteriores continuam preservados. Os botões de transferência manual não aplicam esses filtros, pois são operações separadas.
+
+### Envio, download ou dois sentidos
+Selecione **Bidirecional**, **Somente enviar** ou **Somente baixar**. Os modos unidirecionais somente executam ações novas ou alterações **sem conflito** na direção escolhida; não forçam sobrescritas da outra extremidade, não removem arquivos e não fazem conciliação automática de exclusões. Pode haver conflitos iniciais a resolver manualmente.
+
+### Múltiplas contas com pastas próprias
+Em **Contas**, selecione o remoto desejado e uma pasta local; em **Sincronização → Contas e pastas independentes**, selecione a direção e adicione o perfil. Repita para outras contas e pastas distintas. Cada perfil recebe histórico de comparação, bloqueio de execução e diagnóstico individual. Para editar os perfis, pause primeiro o serviço de sincronização. O limite é 12 perfis e um mesmo remoto não pode possuir dois perfis ativos de espelhamento nesta versão.
+
+**Discos externos:** é possível escolher pastas em discos USB ou outros volumes montados. Se um volume em `/media/<usuário>/<disco>` ou `/run/media/<usuário>/<disco>` não estiver montado, o sincronizador recusa o ciclo dessa conta, em vez de criar arquivos indevidamente no disco do sistema. Um perfil com erro não deve impedir os demais de serem processados.
+
+**Unidades compartilhadas do Google Drive:** são suportadas quando previamente configuradas como remotos apropriados no rclone, mas ainda não há um seletor gráfico completo para permissões, equipes e compartilhamentos.
+
+### Indicador opcional de atividade na bandeja do sistema
+Em **Configurações**, habilite **Iniciar indicador ao entrar no Linux**. O indicador é um processo GTK3 separado, que usa Ayatana AppIndicator quando instalado, mostra a situação da sincronização, abre o aplicativo e permite solicitar um ciclo. Seu funcionamento depende do suporte a indicadores na versão do Zorin. A opção não bloqueia o aplicativo GTK4 quando indisponível. Dependência opcional: `gir1.2-ayatanaappindicator3-0.1` e `gir1.2-gtk-3.0`.
+
+### Integração com Zorin Files e Nautilus
+Em **Disco virtual**, clique em **Adicionar aos favoritos do Zorin Files** para incluir a pasta de montagem na barra lateral do gerenciador de arquivos (formato GTK de bookmarks). **Remover dos favoritos** exclui somente esse atalho, nunca arquivos da nuvem ou outros favoritos. A montagem FUSE continua sendo necessária para navegar pelo Drive virtual.
+
+### Exportação de Google Docs, Sheets e Slides
+Na nova seção **Documentos Google**, exporte cópias em **LibreOffice/ODF**, **Microsoft Office** ou **PDF** com a opção oficial `--drive-export-formats` do rclone. O destino fica fora da pasta espelhada em `~/Documents/DriveExports/<conta>` (ou `~/Documentos/DriveExports/<conta>`). Não sobrescreve arquivos já exportados nem altera documentos nativos da nuvem. A exportação pode incluir documentos Office comuns na mesma conta; não constitui conversão bidirecional ou edição colaborativa integrada. Veja https://rclone.org/drive/ .
+
+### Homologação
+O QA no Ubuntu/Wayland e os testes do rclone com remotos locais são obrigatórios antes da entrega. **Ainda dependem do Zorin OS real**: autorização OAuth do Google, montagem FUSE após login, suporte do painel ao AppIndicator, acesso a arquivos compartilhados com permissões específicas, e exportação de documentos nativos reais. O software permanece Alpha enquanto esses cenários não forem confirmados.
