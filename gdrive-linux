@@ -18,6 +18,7 @@ from background_sync import read_json, STATE_BASE
 from mount_drive import command as mount_command, mount_path, MOUNT_ROOT
 from photos_export import upload_media
 from desktop_files import find_openable_file
+from deletion_review import load_candidates, archive_deletion
 from ui_kit import label, card, action, nav, format_size, section_title, row, button_flow
 
 VERSION = "0.13.0"
@@ -371,6 +372,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         conflicts_scroll.set_min_content_height(120)
         conflicts_scroll.set_child(self.conflicts_list)
         conflicts.append(conflicts_scroll)
+        conflicts.append(action("Revisar exclusões com arquivamento recuperável",
+                                self.review_deletions, "document-open-recent-symbolic"))
         sync_page.append(conflicts)
         self.pages.add_titled(sync_page, "sync", "Sincronização")
 
@@ -524,6 +527,108 @@ class DriveWindow(Gtk.ApplicationWindow):
             "drive-muted", wrap=True))
         page.append(limits)
         self.pages.add_titled(page, "photos", "Google Fotos")
+
+    def review_deletions(self, *_):
+        remote = self.selected_remote()
+        if not remote or not self.folder.is_dir():
+            self.notice("Selecione uma conta e pasta local existentes.", "warning")
+            return
+        self.notice("Comparando exclusões com o último histórico verificado…")
+        threading.Thread(target=self.review_deletions_worker,
+                         args=(remote, self.folder), daemon=True).start()
+
+    def review_deletions_worker(self, remote, folder):
+        try:
+            items = load_candidates(remote, folder)
+            GLib.idle_add(self.show_deletion_review, remote, folder, items, "")
+        except (OSError, ValueError, subprocess.SubprocessError) as exc:
+            GLib.idle_add(self.show_deletion_review, remote, folder, [], str(exc))
+
+    def show_deletion_review(self, remote, folder, items, error):
+        if error:
+            self.notice("Não foi possível revisar exclusões: " + error, "error")
+            return False
+        if not items:
+            self.notice("Nenhuma exclusão elegível para arquivamento neste momento.",
+                        "success")
+            return False
+        dialog = Gtk.Window(title="Revisão segura de exclusões",
+                            transient_for=self, modal=True)
+        dialog.set_default_size(620, 400)
+        panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        for edge in ("top", "bottom", "start", "end"):
+            getattr(panel, "set_margin_" + edge)(20)
+        dialog.set_child(panel)
+        panel.append(section_title("Excluir sem perda definitiva",
+            "Selecione um arquivo apagado de um lado. A cópia restante será "
+            "movida para um arquivo de recuperação, jamais eliminada de vez."))
+        selections = Gtk.ListBox()
+        selections.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        for name, missing in items:
+            entry = Gtk.ListBoxRow()
+            entry.deletion_path = name
+            entry.missing_side = missing
+            description = ("Apagado no computador: " if missing == "local"
+                           else "Apagado na nuvem: ") + name
+            entry.set_child(label(description, wrap=True))
+            selections.append(entry)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_min_content_height(210)
+        scroll.set_child(selections)
+        panel.append(scroll)
+        buttons = button_flow(
+            action("Cancelar", lambda *_: dialog.close()),
+            action("Arquivar cópia restante…",
+                   lambda *_: self.confirm_archive_deletion(dialog, selections,
+                                                           remote, folder),
+                   destructive=True))
+        panel.append(buttons)
+        dialog.present()
+        return False
+
+    def confirm_archive_deletion(self, parent, selections, remote, folder):
+        row = selections.get_selected_row()
+        if row is None:
+            self.notice("Selecione um arquivo para arquivamento.", "warning")
+            return
+        relative, missing = row.deletion_path, row.missing_side
+        confirmation = Gtk.Window(title="Confirmar arquivamento",
+                                  transient_for=parent, modal=True)
+        confirmation.set_default_size(490, 260)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        for edge in ("top", "bottom", "start", "end"):
+            getattr(box, "set_margin_" + edge)(20)
+        confirmation.set_child(box)
+        box.append(section_title("Arquivar a cópia restante?",
+            "Arquivo: " + relative + "\nOrigem apagada: " +
+            ("computador" if missing == "local" else "nuvem") +
+            "\nO original remanescente será movido para a área de backup. "
+            "Confirme apenas se essa exclusão foi intencional."))
+        box.append(action("Manter arquivo", lambda *_: confirmation.close()))
+        def proceed(_button):
+            confirmation.close()
+            parent.close()
+            self.notice("Arquivando cópia restante com proteção contra conflitos…")
+            threading.Thread(target=self.archive_deletion_worker,
+                             args=(remote, folder, relative, missing),
+                             daemon=True).start()
+        box.append(action("Confirmar arquivamento recuperável", proceed,
+                          destructive=True))
+        confirmation.present()
+
+    def archive_deletion_worker(self, remote, folder, relative, missing):
+        try:
+            destination = archive_deletion(remote, folder, relative, missing)
+            success, message = True, "Arquivo guardado em: " + destination
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+            success, message = False, "Arquivamento recusado: " + str(exc)
+        GLib.idle_add(self.archive_deletion_complete, success, message)
+
+    def archive_deletion_complete(self, success, message):
+        self.notice(message, "success" if success else "error")
+        if success:
+            self.preview_sync()
+        return False
 
     def mount_write_toggled(self, checkbox):
         if self.mount_busy:
