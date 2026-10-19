@@ -8,12 +8,12 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, GLib
 from rclone_backend import list_remotes, copy_command, list_files, remote_path
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title="Drive para Linux")
-        self.set_default_size(720, 500)
+        self.set_default_size(860, 620)
         self.proc = None
         self.busy = False
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -100,8 +100,23 @@ class DriveWindow(Gtk.ApplicationWindow):
         file_scroll = Gtk.ScrolledWindow()
         file_scroll.set_min_content_height(140)
         file_scroll.set_child(self.files_list)
+        file_scroll.set_vexpand(True)
         root.append(file_scroll)
+        log_label = Gtk.Label(label="Atividade e transferências")
+        log_label.set_xalign(0)
+        root.append(log_label)
+        scroll.set_min_content_height(110)
+        root.append(scroll)
+        self.browse_generation = 0
         self.refresh()
+        self.dropdown.connect("notify::selected", self.account_changed)
+
+    def account_changed(self, *_):
+        self.path_parts = []
+        self.browse_generation += 1
+        self.path_label.set_text("Meu Drive")
+        while row := self.files_list.get_row_at_index(0):
+            self.files_list.remove(row)
 
     def selected_remote(self):
         index = self.dropdown.get_selected()
@@ -114,18 +129,27 @@ class DriveWindow(Gtk.ApplicationWindow):
         if not remote:
             self.status.set_text("Configure uma conta antes de navegar.")
             return
+        self.browse_generation += 1
+        generation = self.browse_generation
         self.status.set_text("Carregando arquivos…")
         self.path_label.set_text("Meu Drive / " + " / ".join(self.path_parts))
-        threading.Thread(target=self.browse_worker, args=(remote, "/".join(self.path_parts)), daemon=True).start()
+        threading.Thread(target=self.browse_worker, args=(remote, "/".join(self.path_parts), generation), daemon=True).start()
 
-    def browse_worker(self, remote, relative):
+    def browse_worker(self, remote, relative, generation):
         try:
             entries = list_files(remote, relative)
-            GLib.idle_add(self.show_files, entries)
+            GLib.idle_add(self.show_files, entries, generation)
         except (OSError, subprocess.SubprocessError, ValueError) as exc:
-            GLib.idle_add(self.status.set_text, "Falha ao listar arquivos: " + str(exc))
+            GLib.idle_add(self.show_browse_error, str(exc), generation)
 
-    def show_files(self, entries):
+    def show_browse_error(self, message, generation):
+        if generation == self.browse_generation:
+            self.status.set_text("Falha ao listar arquivos: " + message)
+        return False
+
+    def show_files(self, entries, generation):
+        if generation != self.browse_generation:
+            return False
         while row := self.files_list.get_row_at_index(0):
             self.files_list.remove(row)
         for entry in sorted(entries, key=lambda e: (not e["directory"], e["name"].casefold())):
@@ -177,7 +201,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         try:
             names = list_remotes()
             self.remotes.splice(0, self.remotes.get_n_items(), names)
-            self.path_parts = [] if hasattr(self, "path_parts") else []
+            self.path_parts = []
+            self.browse_generation += 1
             if names:
                 self.dropdown.set_selected(0)
             else:
@@ -204,6 +229,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.status.set_text(str(exc))
             return
         self.busy = True
+        self.proc = None
         self.download.set_sensitive(False)
         self.upload.set_sensitive(False)
         self.cancel_button.set_sensitive(True)
@@ -236,6 +262,8 @@ class DriveWindow(Gtk.ApplicationWindow):
     def cancel(self, *_):
         if self.proc is not None:
             self.proc.terminate()
+        elif self.busy:
+            self.status.set_text("Aguardando início da transferência para cancelar…")
 
 class DriveApp(Gtk.Application):
     def __init__(self):
