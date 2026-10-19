@@ -48,8 +48,8 @@ def command(config, root=MOUNT_ROOT, require_tools=False, create=False):
     remote, mount = validate_mount(config, root, require_tools, create)
     read_only = config.get("mount_read_only", True) is not False
     argv = ["rclone", "mount", remote + ":", str(mount),
-            "--vfs-cache-mode", "full", "--vfs-cache-max-size", "2G",
-            "--dir-cache-time", "5m", "--poll-interval", "1m",
+            "--vfs-cache-mode", "writes", "--vfs-cache-max-size", "2G",
+            "--dir-cache-time", "15m", "--poll-interval", "5m",
             "--vfs-write-back", "10s", "--transfers", "1"] + rclone_limits()
     if read_only:
         argv.append("--read-only")
