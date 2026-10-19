@@ -394,6 +394,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.persist()
         self.path_parts = []
         self.browse_generation += 1
+        self.preview_generation += 1
+        self.sync_report.set_text("Selecione Simular para comparar esta conta.")
         self.path_label.set_text("Meu Drive")
         self.back_button.set_sensitive(False)
         self.files_summary.set_text("Clique em Atualizar para listar os arquivos.")
@@ -496,6 +498,7 @@ class DriveWindow(Gtk.ApplicationWindow):
                     self.folder = Path(file.get_path())
                     self.folder_label.set_text(str(self.folder))
                     self.home_folder.set_text(str(self.folder))
+                    self.preview_generation += 1
                     self.persist()
                     self.notice("Pasta selecionada: " + str(self.folder), "success")
             d.destroy()
@@ -529,6 +532,10 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.sync_busy = False
         self.sync_report.set_text(message)
         self.home_sync.set_text(message)
+        self.home_activity.set_text(message)
+        item = label(datetime.now().strftime("%d/%m %H:%M") + " • " + message, wrap=True)
+        self.history.prepend(item)
+        self.history_empty.set_visible(False)
         self.notice(message, "error" if "interrompida" in message else "success")
         self.append(message)
         return False
@@ -568,7 +575,10 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.home_sync.set_text(message)
         while current := self.conflicts_list.get_row_at_index(0):
             self.conflicts_list.remove(current)
-        if conflicts:
+        if message.startswith("Não foi possível"):
+            self.conflicts_list.append(label("A análise não foi concluída.", "drive-muted"))
+            self.notice(message, "error")
+        elif conflicts:
             for item in conflicts[:50]:
                 file_label = label("⚠  " + item, wrap=True)
                 self.conflicts_list.append(file_label)
