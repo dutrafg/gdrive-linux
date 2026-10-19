@@ -499,6 +499,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         open_mount = action("Abrir disco no gerenciador", self.open_mount_folder,
                             "folder-open-symbolic")
         buttons = button_flow(start, stop, open_mount,
+                              action("Aplicar gravação e remontar Drive",
+                                     self.remount_drive, "view-refresh-symbolic", primary=True),
                               action("Verificar requisitos FUSE",
                                      self.refresh_mount_status, "view-refresh-symbolic"))
         intro.append(buttons)
@@ -734,6 +736,35 @@ class DriveWindow(Gtk.ApplicationWindow):
         threading.Thread(target=self.mount_action_worker, args=("start", remote),
                          daemon=True).start()
 
+    def remount_drive(self, *_):
+        if self.mount_busy:
+            return
+        remote = self.selected_remote()
+        if not remote:
+            self.notice("Selecione a conta primeiro.", "warning")
+            return
+        dialog = Gtk.Window(title="Aplicar modo de gravação",
+                            transient_for=self, modal=True)
+        dialog.set_default_size(490, 245)
+        panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        for edge in ("top", "bottom", "start", "end"):
+            getattr(panel, "set_margin_" + edge)(20)
+        dialog.set_child(panel)
+        mode = "gravação e exclusão" if not self.mount_read_only else "somente leitura"
+        panel.append(section_title("Remontar o Drive em modo " + mode,
+            "Feche os documentos abertos antes de continuar. "
+            "As gravações ainda pendentes no cache FUSE precisam ser concluídas."))
+        panel.append(action("Cancelar", lambda *_: dialog.close()))
+        def apply(_button):
+            dialog.close()
+            self.mount_busy = True
+            self.persist()
+            self.mount_status.set_text("Remontando Drive com a nova permissão…")
+            threading.Thread(target=self.mount_action_worker,
+                             args=("restart", remote), daemon=True).start()
+        panel.append(action("Confirmar e remontar", apply, primary=True))
+        dialog.present()
+
     def stop_mount(self, *_):
         if self.mount_busy:
             return
@@ -754,17 +785,19 @@ class DriveWindow(Gtk.ApplicationWindow):
                 ["systemctl", "--user", command, "gdrive-linux-mount.service"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=35)
             success = res.returncode == 0
-            if success and command == "start" and remote:
+            if success and command in ("start", "restart") and remote:
                 path = mount_path(remote)
                 for _ in range(12):
                     if path.is_mount():
                         break
                     time.sleep(0.5)
                 success = path.is_mount()
-            message = ("Disco virtual " +
-                       ("montado." if command == "start" else "desmontado.")
-                       if success else
-                       "Não foi possível concluir a montagem. Verifique fuse3 e o rclone.")
+            message = ("Disco virtual pronto: " +
+                       ("somente leitura." if self.mount_read_only else
+                        "gravação, criação e exclusão habilitadas.")
+                       if success and command in ("start", "restart") else
+                       "Disco virtual desmontado." if success else
+                       "Não foi possível montar. Confira FUSE, rede e cota Google.")
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
             message = "Falha no disco virtual: " + str(exc)
         GLib.idle_add(self.mount_action_complete, success, message)
