@@ -7,6 +7,7 @@ import argparse
 import fcntl
 import hashlib
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -117,6 +118,29 @@ def read_json(path):
         return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
         return {}
+
+def read_baseline(path):
+    """Fail closed on an existing damaged history; never resurrect deleted files.
+
+    A truly new profile has no snapshot. An existing but invalid snapshot
+    requires recovery, not treating everything as never synchronized.
+    """
+    path = Path(path)
+    if not path.exists() and not path.is_symlink():
+        return {}
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("Histórico de sincronização inseguro; arquivo não é regular.")
+    data = read_json(path)
+    hashes = data.get("md5")
+    if not isinstance(hashes, dict):
+        raise ValueError("Histórico de sincronização ilegível. Faça backup e restaure "
+                         "o histórico antes de sincronizar; nenhum dado foi alterado.")
+    for relative, digest in hashes.items():
+        validate_relative(relative)
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{32}", digest):
+            raise ValueError("Histórico de sincronização contém hashes inválidos; "
+                             "a cópia foi interrompida por segurança.")
+    return hashes
 
 def inventories(remote, folder, includes=(), excludes=()):
     local = {key: val for key, val in local_inventory(folder).items()
@@ -259,9 +283,7 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
         except BlockingIOError:
             return {"state": "busy", "copied": 0, "conflicts": 0}
         snapshot_path = state_base / (key + ".json")
-        full_baseline = read_json(snapshot_path).get("md5", {})
-        if not isinstance(full_baseline, dict):
-            raise ValueError("Estado da sincronização inválido")
+        full_baseline = read_baseline(snapshot_path)
         baseline = filtered_inventory(full_baseline, includes, excludes)
         excluded_baseline = {p: digest for p, digest in full_baseline.items()
                              if p not in baseline}
