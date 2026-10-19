@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 
 from settings import load_settings
+from rclone_config import activate_worker_config
 from rclone_errors import rclone_limits
 
 SAFE_REMOTE = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,79}$")
@@ -101,6 +102,7 @@ def main():
         parser.error("Use --serve ou --check")
     try:
         settings = load_settings()
+        activate_worker_config(settings)
         # Check the local remote before creating even an empty mount directory.
         # This never touches the Google API and does not print OAuth credentials.
         if args.serve:
