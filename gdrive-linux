@@ -7,7 +7,7 @@ from pathlib import Path
 import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, GLib, Gio
-from rclone_backend import list_remotes, copy_command, list_files
+from rclone_backend import list_remotes, copy_command, list_files, search_files
 from settings import load_settings, save_settings
 from progress import parse_progress
 from google_oauth import google_config_command, verify_google_remote
@@ -282,6 +282,14 @@ class DriveWindow(Gtk.ApplicationWindow):
         toolbar.append(self.path_label)
         toolbar.append(action("Atualizar", self.browse, "view-refresh-symbolic"))
         files_card.append(toolbar)
+        search_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.search_entry = Gtk.SearchEntry()
+        self.search_entry.set_placeholder_text("Buscar arquivos nesta conta Google")
+        self.search_entry.set_hexpand(True)
+        self.search_entry.connect("activate", self.search_remote)
+        search_row.append(self.search_entry)
+        search_row.append(action("Pesquisar", self.search_remote, "system-search-symbolic"))
+        files_card.append(search_row)
         names = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         names.add_css_class("drive-data-line")
         names.append(label("NOME", "drive-small-note", hexpand=True))
@@ -536,6 +544,29 @@ class DriveWindow(Gtk.ApplicationWindow):
         if index == Gtk.INVALID_LIST_POSITION or index >= self.remotes.get_n_items():
             return None
         return self.remotes.get_string(index)
+
+    def search_remote(self, *_):
+        remote = self.selected_remote()
+        if not remote:
+            self.notice("Selecione uma conta antes de pesquisar.", "warning")
+            return
+        term = self.search_entry.get_text().strip()
+        if len(term) < 2:
+            self.notice("Informe pelo menos dois caracteres para pesquisar.", "warning")
+            return
+        self.browse_generation += 1
+        generation = self.browse_generation
+        self.files_summary.set_text("Pesquisando arquivos remotos…")
+        self.notice("Pesquisando sem transferir arquivos…")
+        threading.Thread(target=self.search_remote_worker,
+                         args=(remote, term, generation), daemon=True).start()
+
+    def search_remote_worker(self, remote, term, generation):
+        try:
+            entries = search_files(remote, term)
+            GLib.idle_add(self.show_files, entries, generation)
+        except (OSError, ValueError, subprocess.SubprocessError) as exc:
+            GLib.idle_add(self.show_browse_error, str(exc), generation)
 
     def browse(self, *_):
         remote = self.selected_remote()
