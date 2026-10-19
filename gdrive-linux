@@ -31,6 +31,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.transfer_generation = 0
         self.refresh_generation = 0
         self.browse_generation = 0
+        self.preview_generation = 0
         self.auto_enabled = False
         self.auto_generation = 0
         self.auto_interval_seconds = 300
@@ -494,7 +495,8 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.status.set_text("Selecione uma conta e pasta local existente.")
             return
         self.sync_busy = True
-        self.status.set_text("Transferindo somente arquivos novos (máximo 100)…")
+        self.notice("Transferindo apenas arquivos novos, até 100 por operação…")
+        self.sync_report.set_text("Transferência seletiva em andamento…")
         threading.Thread(target=self.safe_sync_worker,
                          args=(remote, self.folder), daemon=True).start()
 
@@ -509,33 +511,60 @@ class DriveWindow(Gtk.ApplicationWindow):
 
     def finish_safe_sync(self, message):
         self.sync_busy = False
-        self.status.set_text(message)
+        self.sync_report.set_text(message)
+        self.home_sync.set_text(message)
+        self.notice(message, "error" if "interrompida" in message else "success")
         self.append(message)
         return False
 
     def preview_sync(self, *_):
+        if self.busy or self.sync_busy:
+            self.notice("Aguarde a operação atual.", "warning")
+            return
         remote = self.selected_remote()
         if not remote or not self.folder.is_dir():
-            self.status.set_text("Selecione uma conta e pasta local existente.")
+            self.notice("Selecione uma conta e pasta local existente.", "warning")
             return
-        self.status.set_text("Comparando arquivos sem transferir ou excluir nada…")
+        self.preview_generation += 1
+        generation = self.preview_generation
+        self.sync_report.set_text("Analisando arquivos locais e remotos…")
+        self.notice("Comparando arquivos sem alterar os dados…")
         threading.Thread(target=self.preview_sync_worker,
-                         args=(remote, self.folder), daemon=True).start()
+                         args=(remote, self.folder, generation), daemon=True).start()
 
-    def preview_sync_worker(self, remote, folder):
+    def preview_sync_worker(self, remote, folder, generation):
         try:
             local = local_inventory(folder)
             cloud = remote_inventory(remote)
             plan = conservative_plan(local, cloud)
-            message = ("Simulação: " + str(len(plan.download)) + " para baixar, " +
-                       str(len(plan.upload)) + " para enviar, " +
-                       str(len(plan.conflicts)) + " conflitos. Nenhuma alteração feita.")
-            GLib.idle_add(self.status.set_text, message)
-            GLib.idle_add(self.append, message)
-            for name in plan.conflicts[:30]:
-                GLib.idle_add(self.append, "Conflito (sem alterações): " + name)
+            message = (str(len(plan.download)) + " novos para baixar • " +
+                       str(len(plan.upload)) + " novos para enviar • " +
+                       str(len(plan.conflicts)) + " conflitos. Nenhum arquivo alterado.")
+            GLib.idle_add(self.show_sync_plan, generation, message, plan.conflicts)
         except (OSError, ValueError, subprocess.SubprocessError) as exc:
-            GLib.idle_add(self.status.set_text, "Simulação falhou: " + str(exc))
+            GLib.idle_add(self.show_sync_plan, generation,
+                          "Não foi possível analisar a sincronização: " + str(exc), ())
+
+    def show_sync_plan(self, generation, message, conflicts):
+        if generation != self.preview_generation:
+            return False
+        self.sync_report.set_text(message)
+        self.home_sync.set_text(message)
+        while current := self.conflicts_list.get_row_at_index(0):
+            self.conflicts_list.remove(current)
+        if conflicts:
+            for item in conflicts[:50]:
+                file_label = label("⚠  " + item, wrap=True)
+                self.conflicts_list.append(file_label)
+            if len(conflicts) > 50:
+                self.conflicts_list.append(label("Mais " + str(len(conflicts) - 50) +
+                                                 " conflito(s); consulte os registros."))
+            self.notice(message, "warning")
+        else:
+            self.conflicts_list.append(label("Nenhum conflito identificado.", "drive-muted"))
+            self.notice(message, "success" if "Não foi possível" not in message else "error")
+        self.append(message)
+        return False
 
     def open_local_folder(self, *_):
         try:
