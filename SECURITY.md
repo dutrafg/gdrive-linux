@@ -79,7 +79,7 @@ Use uma conta e pasta de testes, confirme origem e destino, mantenha backup sepa
 - A compatibilidade plena com Google Drive para Windows, presença Office, Google Photos integral, permissões de unidades compartilhadas e integração nativa de ícones por arquivo permanece não garantida.
 
 
-## Diagnóstico seguro do disco virtual — v0.14.2
+## Diagnóstico seguro do disco virtual — v0.14.3
 
 A GUI inclui verificação local de rclone, nome remoto, FUSE, permissões e `systemd --user`, sem transmitir nomes de arquivos à nuvem. A prova remota de acesso é uma consulta **manual, explícita, somente leitura** e com erros normalizados, nunca com JSON bruto ou token exibido. O serviço usa PATH e HOME explícitos do usuário para evitar configurações divergentes entre GTK e systemd.
 
@@ -87,10 +87,18 @@ Não são executados `chmod -R`, `chown -R`, `fusermount -uz` automático, remo�
 
 Não compartilhar `rclone.conf` ou logs do journal completos: eles podem expor dados pessoais e metadados. O recurso 403 não é solucionado automaticamente; o usuário precisa de autorização OAuth compatível e cota disponível.
 
-## Segurança adicional da v0.14.2
+## Segurança adicional da v0.14.3
 
 O aplicativo não altera a conta de montagem enquanto FUSE estiver ativo e não muda a pasta espelhada durante tarefas. Desligar o autostart não desmonta arquivos em uso; desmontagem permanece ação separada. Raízes simbólicas ou sem permissão são recusadas, sem chmod/chown recursivo nem limpeza automática de cache.
 
 A unidade FUSE usa cache próprio de usuário e o serviço reinicia com atraso para não agravar erros de quota. O status de FUSE montado não garante a disponibilidade da conta Google. O diagnóstico pode ser copiado apenas com mensagens normalizadas, sem rclone.conf, tokens OAuth ou linhas integrais do journal. O indicador GTK3/Ayatana é opcional e testado antes da ativação.
 
 Ainda são necessários backup independente, verificação de gravações pendentes no cache e homologação real no Zorin OS para garantir operações remotas e recuperação de rede.
+
+## Segurança e integridade da v0.14.3
+
+- O aplicativo bloqueia remotos com caracteres de controle ou nomes iniciados em `-`, evitando ambiguidade na interpretação de parâmetros do rclone.
+- Preferências locais são escritas em arquivos temporários únicos, com `fsync` e substituição atômica; permissões permanecem `0600` em pasta `0700`.
+- Uma conta com erro 403/quota ou falha operacional faz o serviço retornar código diferente de zero; um lote incompleto permanece claramente marcado como parcial.
+- Nenhum recurso novo desta versão propaga exclusões definitivas, remove caches FUSE ou altera permissões de pastas inteiras. Controles de exclusão recuperável continuam exigindo opt-in.
+- O status gráfico por conta omite nomes de arquivos, tokens, conteúdo de logs e caminhos completos; não é diagnóstico de OAuth real sem testar a conta.
