@@ -11,6 +11,16 @@ class BackendTests(unittest.TestCase):
             with self.assertRaises(ValueError): b.remote_path('meudrive', path)
     def test_bad_remote(self):
         with self.assertRaises(ValueError): b.remote_path('foo:bar')
+    def test_rejects_flag_like_and_control_names(self):
+        for name in ("-config", "\\x00evil", "bad\\nremote", None):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                b.remote_path(name)
+
+    @patch('rclone_backend.subprocess.run')
+    def test_list_remotes_ignores_flag_like_name(self, run):
+        run.return_value.stdout = 'valid:\\n--config:\\nsecond:\\n'
+        self.assertEqual(b.list_remotes(), ['valid', 'second'])
+
     def test_copy(self):
         with tempfile.TemporaryDirectory() as folder:
             self.assertEqual(b.copy_command('drive', folder, 'download')[:3], ['rclone', 'copy', 'drive:'])
