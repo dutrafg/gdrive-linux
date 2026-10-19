@@ -19,7 +19,7 @@ def plan_sync(local, remote):
     )
 
 def validate_relative(path):
-    if not isinstance(path, str) or not path or path.startswith("/") or "\\ " in path:
+    if not isinstance(path, str) or not path or path.startswith("/"):
         raise ValueError("Caminho inválido")
     parts = Path(path).parts
     if any(p in (".", "..") for p in parts) or "\x00" in path or "\\" in path:
