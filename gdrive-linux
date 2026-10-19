@@ -1749,6 +1749,12 @@ class DriveWindow(Gtk.ApplicationWindow):
         if self.restoring_auto:
             return
         requested = switch.get_active()
+        if requested and self.profiles_configured and not self.sync_profiles:
+            self.notice("Adicione ao menos um perfil em Contas e pastas independentes.", "warning")
+            self.restoring_auto = True
+            switch.set_active(False)
+            self.restoring_auto = False
+            return
         if requested and not self.sync_profiles and (not self.selected_remote() or not self.folder.is_dir()):
             self.notice("Selecione uma conta e uma pasta existente antes de ativar.", "warning")
             self.restoring_auto = True
