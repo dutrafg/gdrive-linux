@@ -1,6 +1,7 @@
 """Local settings: never store OAuth tokens here."""
 import json
 import os
+import tempfile
 from pathlib import Path
 
 CONFIG_DIR = Path.home() / ".config" / "gdrive-linux"
@@ -61,12 +62,16 @@ def save_settings(folder, account="", account_names=None, auto_sync_enabled=Fals
             and len(k) <= 60 and len(v) <= 120
         }
     payload = json.dumps(payload_data, ensure_ascii=False)
-    temporary = CONFIG_FILE.with_suffix(".tmp")
-    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    # Unique temporary files prevent simultaneous UI/service settings writes
+    # from trampling a fixed .tmp filename. Existing settings survive failures.
+    fd, temporary = tempfile.mkstemp(prefix=".settings-", dir=CONFIG_DIR)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as stream:
             stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(temporary, 0o600)
         os.replace(temporary, CONFIG_FILE)
     finally:
-        if temporary.exists():
-            temporary.unlink()
+        if os.path.exists(temporary):
+            os.unlink(temporary)
