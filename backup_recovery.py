@@ -17,10 +17,16 @@ class RecoveryItem:
     relative: str
     label: str
 
-def recovery_root(home=None):
+def recovery_root(home=None, mirror_folder=None):
     home = Path.home() if home is None else Path(home)
     docs = home / ("Documentos" if (home / "Documentos").is_dir() else "Documents")
-    return docs / "DriveRecuperados"
+    proposed = docs / "DriveRecuperados"
+    if mirror_folder is not None:
+        mirror = Path(mirror_folder).expanduser().resolve()
+        destination = proposed.resolve()
+        if destination == mirror or destination in mirror.parents or mirror in destination.parents:
+            return home / ".local" / "share" / "gdrive-linux" / "recovered"
+    return proposed
 
 def list_local_backups(remote, folder, backup_base=BACKUP_BASE, limit=30):
     base = Path(backup_base) / job_key(remote, Path(folder))
@@ -38,15 +44,19 @@ def list_local_backups(remote, folder, backup_base=BACKUP_BASE, limit=30):
         files.append((path.stat().st_mtime_ns, RecoveryItem(path, relative, relative)))
     return [row[1] for row in sorted(files, key=lambda pair: pair[0], reverse=True)[:limit]]
 
-def restore_local_backup(item, destination=None):
+def restore_local_backup(item, destination=None, mirror_folder=None):
     if not isinstance(item, RecoveryItem):
         raise ValueError("Selecione uma cópia de backup válida.")
     source = item.path
     if source.is_symlink() or not source.is_file():
         raise ValueError("A cópia de backup está indisponível ou é um link simbólico.")
     relative = validate_relative(item.relative)
-    root = recovery_root() if destination is None else Path(destination).expanduser()
+    root = recovery_root(mirror_folder=mirror_folder) if destination is None else Path(destination).expanduser()
     root = root.resolve()
+    if mirror_folder is not None:
+        mirror = Path(mirror_folder).expanduser().resolve()
+        if root == mirror or root in mirror.parents or mirror in root.parents:
+            raise ValueError("Recuperação bloqueada: destino está dentro da pasta sincronizada.")
     target = root / relative
     if not target.resolve().is_relative_to(root):
         raise ValueError("Recuperação fora da pasta segura.")
