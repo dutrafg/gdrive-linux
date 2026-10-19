@@ -2,6 +2,7 @@
 """Drive para Linux — GTK4 frontend for rclone."""
 import subprocess
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 import gi
@@ -29,6 +30,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.proc = None
         self.busy = False
         self.sync_busy = False
+        self.mount_busy = False
+        self.photos_busy = False
         self.verify_generation = 0
         self.cancel_requested = False
         self.progress_known = False
@@ -436,6 +439,89 @@ class DriveWindow(Gtk.ApplicationWindow):
         privacy.append(label("Versão " + VERSION + " Alpha • GTK4 e rclone", "drive-small-note"))
         settings_page.append(privacy)
         self.pages.add_titled(settings_page, "settings", "Configurações")
+
+    def build_mount(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=15)
+        intro = card("Disco virtual do Google Drive",
+                     "Acesse arquivos sob demanda no gerenciador de arquivos do Linux. "
+                     "Esta pasta online é separada do espelhamento local.",
+                     "drive-harddisk-symbolic")
+        self.mount_info = label("Selecione a conta Google Drive em Contas.",
+                                "drive-path", wrap=True)
+        intro.append(self.mount_info)
+        self.mount_status = label("Disco virtual não iniciado.", "drive-muted", wrap=True)
+        intro.append(self.mount_status)
+        readonly = Gtk.CheckButton(label="Permitir modificar arquivos pelo disco virtual (experimental)")
+        self.mount_write_check = readonly
+        readonly.set_active(not self.mount_read_only)
+        readonly.connect("toggled", self.mount_write_toggled)
+        intro.append(readonly)
+        intro.append(label(
+            "O modo padrão é SOMENTE LEITURA. Para trabalhar em documentos, "
+            "prefira a pasta espelhada. A gravação pela montagem usa cache FUSE "
+            "e pode gerar conflitos com edições remotas.",
+            "drive-muted", wrap=True))
+        start = action("Montar Drive", self.start_mount, "media-playback-start-symbolic",
+                       primary=True)
+        stop = action("Desmontar Drive", self.stop_mount, "media-playback-stop-symbolic")
+        open_mount = action("Abrir disco no gerenciador", self.open_mount_folder,
+                            "folder-open-symbolic")
+        buttons = button_flow(start, stop, open_mount,
+                              action("Verificar requisitos FUSE",
+                                     self.refresh_mount_status, "view-refresh-symbolic"))
+        intro.append(buttons)
+        page.append(intro)
+        hints = card("Requisitos no Zorin OS",
+                     "O rclone utiliza FUSE3 para expor a pasta como sistema de arquivos.",
+                     "dialog-information-symbolic")
+        hints.append(label("Instale fuse3, confirme a presença de /dev/fuse e "
+                           "mantenha sua sessão Linux conectada. A montagem não "
+                           "substitui a sincronização espelhada; é uma opção adicional.",
+                           "drive-muted", wrap=True))
+        page.append(hints)
+        self.pages.add_titled(page, "mount", "Disco virtual")
+
+    def build_photos(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=15)
+        top = card("Enviar fotos e vídeos ao Google Fotos",
+                   "Envio manual para um álbum de um remoto Google Photos "
+                   "configurado no rclone. Sem exclusões.",
+                   "camera-photo-symbolic")
+        top.append(label("Conta Google Fotos (não é a conta Google Drive):",
+                         "drive-muted"))
+        self.photos_dropdown = Gtk.DropDown(model=self.remotes)
+        top.append(self.photos_dropdown)
+        top.append(label("Nome do álbum de destino:", "drive-muted"))
+        self.photos_album = Gtk.Entry()
+        self.photos_album.set_text("Drive para Linux")
+        top.append(self.photos_album)
+        self.photos_info = label("Origem: pasta local selecionada em Contas.",
+                                 "drive-muted", wrap=True)
+        top.append(self.photos_info)
+        top.append(button_flow(
+            action("Verificar fotos e vídeos", self.preview_photos,
+                   "system-search-symbolic"),
+            action("Enviar mídia ao Google Fotos", self.confirm_photos,
+                   "go-up-symbolic", primary=True),
+            action("Configurar outra conta no rclone", self.configure,
+                   "utilities-terminal-symbolic")))
+        guide = Gtk.LinkButton.new_with_label(
+            "https://rclone.org/googlephotos/",
+            "Limitações e configuração da API do Google Fotos")
+        guide.set_halign(Gtk.Align.START)
+        top.append(guide)
+        page.append(top)
+        limits = card("Limitações da API Google Photos",
+                      "O aplicativo não consegue restaurar automaticamente "
+                      "toda a biblioteca antiga do Google Fotos.",
+                      "dialog-warning-symbolic")
+        limits.append(label(
+            "Desde março de 2025, o rclone só pode baixar mídias enviadas por "
+            "seu próprio aplicativo. Para envio confiável, configure seu "
+            "Client ID e Client Secret no assistente seguro do rclone.",
+            "drive-muted", wrap=True))
+        page.append(limits)
+        self.pages.add_titled(page, "photos", "Google Fotos")
 
     def notice(self, message, tone=None):
         self.status.set_text(message)
