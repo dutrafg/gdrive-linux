@@ -11,7 +11,7 @@ from rclone_backend import list_remotes, copy_command, list_files
 from settings import load_settings, save_settings
 from progress import parse_progress
 
-VERSION = "0.9.1"
+VERSION = "0.9.2"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -24,6 +24,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.refresh_generation = 0
         self.cancel_requested = False
         self.progress_known = False
+        self.transfer_generation = 0
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         root.set_margin_top(20)
         root.set_margin_bottom(20)
@@ -310,6 +311,8 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.status.set_text(str(exc))
             return
         self.busy = True
+        self.transfer_generation += 1
+        generation = self.transfer_generation
         direction_name = "Download" if direction == "download" else "Upload"
         self.current_history = Gtk.Label(label=direction_name + " • Em andamento")
         self.current_history.set_xalign(0)
@@ -326,7 +329,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.pages.set_visible_child_name("activity")
         self.progress.pulse()
         self.progress_timer = GLib.timeout_add(250, self.pulse_progress)
-        threading.Thread(target=self.worker, args=(command,), daemon=True).start()
+        threading.Thread(target=self.worker, args=(command, generation), daemon=True).start()
 
     def pulse_progress(self):
         if not self.busy:
@@ -335,35 +338,36 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.progress.pulse()
         return True
 
-    def worker(self, command):
+    def worker(self, command, generation):
+        result = "Falha ao iniciar transferência."
+        proc = None
         try:
             if self.cancel_requested:
-                GLib.idle_add(self.status.set_text, "Transferência cancelada.")
+                result = "Transferência cancelada."
                 return
             proc = subprocess.Popen(
-                command,
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+                command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1)
             self.proc = proc
             if self.cancel_requested:
                 proc.terminate()
             for line in proc.stdout:
                 progress = parse_progress(line)
                 if progress is not None:
-                    GLib.idle_add(self.update_progress, progress)
+                    GLib.idle_add(self.update_progress, progress, generation)
                 else:
                     GLib.idle_add(self.append, line.rstrip())
             code = proc.wait()
-            GLib.idle_add(self.status.set_text,
-                          "Transferência cancelada." if self.cancel_requested else
-                          ("Transferência concluída." if code == 0 else f"Transferência encerrada (código {code})."))
+            result = ("Transferência cancelada." if self.cancel_requested else
+                      "Transferência concluída." if code == 0 else
+                      "Transferência falhou (código " + str(code) + ").")
         except OSError as exc:
-            GLib.idle_add(self.status.set_text, str(exc))
+            result = "Falha na transferência: " + str(exc)
         finally:
-            self.proc = None
-            GLib.idle_add(self.finish)
+            GLib.idle_add(self.finish, generation, result)
 
-    def update_progress(self, data):
-        if not self.busy:
+    def update_progress(self, data, generation):
+        if not self.busy or generation != self.transfer_generation:
             return False
         self.progress_known = True
         self.progress.set_fraction(data["percentage"] / 100)
@@ -373,13 +377,17 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.progress.set_text(detail)
         return False
 
-    def finish(self):
+    def finish(self, generation, result):
+        if generation != self.transfer_generation:
+            return False
+        self.proc = None
+        self.status.set_text(result)
         if self.current_history is not None:
-            self.current_history.set_text(datetime.now().strftime("%d/%m %H:%M") + " • " + self.status.get_text())
+            self.current_history.set_text(datetime.now().strftime("%d/%m %H:%M") + " • " + result)
             self.current_history = None
         self.busy = False
-        self.progress.set_fraction(0)
-        self.progress.set_text(self.status.get_text())
+        self.progress.set_fraction(1 if result == "Transferência concluída." else 0)
+        self.progress.set_text(result)
         self.download.set_sensitive(True)
         self.upload.set_sensitive(True)
         self.cancel_button.set_sensitive(False)
