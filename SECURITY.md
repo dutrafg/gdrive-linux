@@ -1,6 +1,6 @@
 # Política de segurança — Drive para Linux
 
-**Estado:** 0.9.4 Alpha, software experimental. Não há auditoria de segurança independente nem garantia de uso em produção.
+**Estado:** 0.9.5 Alpha, software experimental. Não há auditoria de segurança independente nem garantia de uso em produção.
 
 ## Reportar vulnerabilidades
 
@@ -21,7 +21,7 @@ Informe versão, distribuição Linux, passos de reprodução, impacto e registr
 - A transferência atual usa `rclone copy` com argumentos passados como lista, sem shell.
 - `copy` não remove arquivos ausentes na origem, mas **pode substituir arquivos no destino**. Faça backups e teste em diretórios descartáveis.
 - O cancelamento pode deixar arquivos já copiados. Não há reversão transacional nem resolução automática de conflitos.
-- Não há `sync`, `bisync` ou exclusão automática implementados.
+- A atualização automática opcional executa cópia da nuvem para a pasta local a cada cinco minutos enquanto a janela está aberta; pode sobrescrever arquivos locais, mas não faz exclusão automática. Não há `sync`, `bisync` nem resolução de conflitos implementados.
 - Escolha uma pasta local existente, com permissões adequadas. Não execute o aplicativo como root.
 
 ## Armazenamento local
