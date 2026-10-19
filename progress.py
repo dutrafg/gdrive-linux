@@ -1,8 +1,8 @@
 """Parse rclone --stats-one-line output without accessing credentials."""
 import re
 
-STATS = re.compile(r"Transferred:\\s*([^,]+),\\s*(\\d{1,3})%")
-RATE = re.compile(r",\\s*([^,]+/s)")
+STATS = re.compile(r"Transferred:\s*([^,]+),\s*(\d{1,3})%")
+RATE = re.compile(r",\s*([^,]+/s)")
 
 def parse_progress(line):
     match = STATS.search(line)
