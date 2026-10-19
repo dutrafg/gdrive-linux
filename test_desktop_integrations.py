@@ -93,6 +93,13 @@ class TrayTests(unittest.TestCase):
         self.assertIn("4", message)
         self.assertFalse(alarm)
 
+    def test_stale_sync_is_not_reported_as_healthy(self):
+        from datetime import datetime, timedelta, timezone
+        old = (datetime.now(timezone.utc) - timedelta(minutes=45)).isoformat()
+        label, warn = status_summary({"state":"ok", "time":old, "pending":0})
+        self.assertTrue(warn)
+        self.assertIn("Sem atualização recente", label)
+
     def test_per_user_autostart(self):
         with tempfile.TemporaryDirectory() as root:
             base = Path(root)
