@@ -453,6 +453,19 @@ class DriveWindow(Gtk.ApplicationWindow):
     def account_changed(self, *_):
         if self.restoring_accounts:
             return
+        previous = self.preferences.get("account", "")
+        requested = self.selected_remote()
+        if self.auto_enabled and previous and requested != previous:
+            self.restoring_accounts = True
+            try:
+                names = [self.remotes.get_string(i) for i in
+                         range(self.remotes.get_n_items())]
+                if previous in names:
+                    self.dropdown.set_selected(names.index(previous))
+            finally:
+                self.restoring_accounts = False
+            self.notice("Pause a sincronização contínua antes de trocar a conta.", "warning")
+            return
         self.persist()
         self.verify_generation += 1
         remote = self.selected_remote()
@@ -638,6 +651,9 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.browse()
 
     def create_default_folder(self, *_):
+        if self.auto_enabled:
+            self.notice("Pause a sincronização contínua antes de criar/trocar a pasta.", "warning")
+            return
         """Create only the user's explicit default directory after a click."""
         target = Path.home() / "GoogleDrive"
         try:
@@ -653,6 +669,9 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.notice("Não foi possível criar a pasta: " + str(exc), "error")
 
     def choose_folder(self, *_):
+        if self.auto_enabled:
+            self.notice("Pause a sincronização contínua antes de trocar a pasta.", "warning")
+            return
         dialog = Gtk.FileChooserNative(title="Escolher pasta local", transient_for=self,
                                       action=Gtk.FileChooserAction.SELECT_FOLDER,
                                       accept_label="Selecionar", cancel_label="Cancelar")
