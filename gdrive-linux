@@ -1118,6 +1118,13 @@ class DriveWindow(Gtk.ApplicationWindow):
             if remote else "Conta: nenhuma selecionada")
         self.home_accounts.set_text(self.account_display(remote)
                                     if remote else "Nenhuma conta conectada")
+        if hasattr(self, "include_entry") and remote:
+            for profile in self.sync_profiles:
+                if profile["account"] == remote:
+                    self.include_entry.set_text(", ".join(profile["sync_includes"]))
+                    self.exclude_entry.set_text(", ".join(profile["sync_excludes"]))
+                    self.sync_mode_dropdown.set_selected(MODES.index(profile["mode"]))
+                    break
         self.path_parts = []
         self.search_mode = False
         self.browse_generation += 1
@@ -1551,9 +1558,22 @@ class DriveWindow(Gtk.ApplicationWindow):
         except ValueError as exc:
             self.notice("Filtros inválidos: " + str(exc), "warning")
             return
+        index = self.sync_mode_dropdown.get_selected()
+        chosen = MODES[index] if index < len(MODES) else "bidirectional"
+        remote = self.selected_remote()
+        if self.auto_enabled and any(p["account"] == remote for p in self.sync_profiles):
+            self.notice("Pause o serviço antes de modificar um perfil ativo.", "warning")
+            return
         self.sync_includes, self.sync_excludes = includes, excludes
+        self.sync_mode = chosen
+        for profile in self.sync_profiles:
+            if profile["account"] == remote:
+                profile["sync_includes"] = includes
+                profile["sync_excludes"] = excludes
+                profile["mode"] = chosen
         self.persist()
-        self.notice("Regras salvas para os próximos ciclos automáticos. "
+        self.update_profiles_ui()
+        self.notice("Regras e direção salvas para os próximos ciclos automáticos. "
                     "Nenhum arquivo foi removido.", "success")
 
     def archive_changed(self, switch, *_):
@@ -1595,7 +1615,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         if self.restoring_auto:
             return
         requested = switch.get_active()
-        if requested and (not self.selected_remote() or not self.folder.is_dir()):
+        if requested and not self.sync_profiles and (not self.selected_remote() or not self.folder.is_dir()):
             self.notice("Selecione uma conta e uma pasta existente antes de ativar.", "warning")
             self.restoring_auto = True
             switch.set_active(False)
