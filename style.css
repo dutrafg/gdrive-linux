@@ -80,3 +80,21 @@ button:disabled { opacity: 0.47; }
 .drive-content entry, .drive-dialog entry { min-height: 36px; border-radius: 9px; }
 .drive-content dropdown { min-height: 36px; border-radius: 9px; }
 .drive-quiet { color: #667c92; }
+
+/* Accessibility and narrow-window refinements: keep actions legible on Zorin/GNOME. */
+.drive-sidebar button.drive-nav:focus-visible,
+.drive-content button:focus-visible,
+.drive-dialog button:focus-visible {
+  outline: 2px solid #4aa3ff;
+  outline-offset: 2px;
+}
+.drive-sidebar button.drive-nav { transition: background 130ms ease; }
+.drive-card { margin-bottom: 2px; }
+.drive-data-line label { letter-spacing: 0.3px; }
+.drive-file-list row:selected { background: #dfedff; color: #163c65; }
+.drive-file-list row:selected label { color: #163c65; }
+.drive-history row:selected { background: #e9f3ff; }
+.drive-content scrollbar slider { border-radius: 8px; }
+.drive-dialog .drive-step-active { font-weight: 800; }
+.drive-content button.drive-primary:disabled,
+.drive-dialog button.drive-connect:disabled { background: #a1b9d5; border-color: #a1b9d5; opacity: 1; }
