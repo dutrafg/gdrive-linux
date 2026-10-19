@@ -26,6 +26,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.progress_known = False
         self.transfer_generation = 0
         self.auto_enabled = False
+        self.auto_generation = 0
         self.auto_interval_seconds = 300
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         root.set_margin_top(20)
@@ -274,14 +275,16 @@ class DriveWindow(Gtk.ApplicationWindow):
 
     def auto_changed(self, switch, *_):
         self.auto_enabled = switch.get_active()
+        self.auto_generation += 1
+        generation = self.auto_generation
         if self.auto_enabled:
             self.status.set_text("Atualização automática ativa nesta sessão.")
-            GLib.timeout_add_seconds(self.auto_interval_seconds, self.auto_tick)
+            GLib.timeout_add_seconds(self.auto_interval_seconds, self.auto_tick, generation)
         else:
             self.status.set_text("Atualização automática desativada.")
 
-    def auto_tick(self):
-        if not self.auto_enabled:
+    def auto_tick(self, generation):
+        if not self.auto_enabled or generation != self.auto_generation:
             return False
         if not self.busy and self.selected_remote() and self.folder.is_dir():
             self.transfer(None, "download")
