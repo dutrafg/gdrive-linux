@@ -70,11 +70,12 @@ jobs:
           cp google_oauth.py pkg/usr/share/gdrive-linux/google_oauth.py
           cp sync_plan.py pkg/usr/share/gdrive-linux/sync_plan.py
           cp safe_sync.py pkg/usr/share/gdrive-linux/safe_sync.py
+          cp style.css pkg/usr/share/gdrive-linux/style.css
           printf '#!/bin/sh\nexec /usr/bin/python3 /usr/share/gdrive-linux/gdrive-linux "$@"\n' > pkg/usr/bin/gdrive-linux
           chmod 755 pkg/usr/bin/gdrive-linux
           cat > pkg/DEBIAN/control <<'EOF'
           Package: gdrive-linux
-          Version: 0.10.0
+          Version: 0.11.0
           Section: utils
           Priority: optional
           Architecture: all
@@ -92,16 +93,16 @@ jobs:
           Categories=Network;FileTransfer;
           Terminal=false
           EOF
-          dpkg-deb --build pkg gdrive-linux_0.10.0_all.deb
+          dpkg-deb --build pkg gdrive-linux_0.11.0_all.deb
       - name: Validate Debian package metadata and contents
         run: |
           set -eu
-          dpkg-deb --info gdrive-linux_0.10.0_all.deb
-          dpkg-deb --contents gdrive-linux_0.10.0_all.deb
-          test "$(dpkg-deb -f gdrive-linux_0.10.0_all.deb Package)" = "gdrive-linux"
-          test "$(dpkg-deb -f gdrive-linux_0.10.0_all.deb Version)" = "0.10.0"
+          dpkg-deb --info gdrive-linux_0.11.0_all.deb
+          dpkg-deb --contents gdrive-linux_0.11.0_all.deb
+          test "$(dpkg-deb -f gdrive-linux_0.11.0_all.deb Package)" = "gdrive-linux"
+          test "$(dpkg-deb -f gdrive-linux_0.11.0_all.deb Version)" = "0.11.0"
           mkdir -p /tmp/gdrive-deb-check
-          dpkg-deb -x gdrive-linux_0.10.0_all.deb /tmp/gdrive-deb-check
+          dpkg-deb -x gdrive-linux_0.11.0_all.deb /tmp/gdrive-deb-check
           test -x /tmp/gdrive-deb-check/usr/bin/gdrive-linux
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/gdrive-linux
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/rclone_backend.py
@@ -110,21 +111,23 @@ jobs:
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/google_oauth.py
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/sync_plan.py
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/safe_sync.py
+          test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/style.css
           test -f /tmp/gdrive-deb-check/usr/share/applications/gdrive-linux.desktop
           python3 -m py_compile /tmp/gdrive-deb-check/usr/share/gdrive-linux/gdrive-linux
       - name: Install Debian package and verify launcher
         run: |
           set -eu
-          sudo apt-get install -y ./gdrive-linux_0.10.0_all.deb
+          sudo apt-get install -y ./gdrive-linux_0.11.0_all.deb
           test "$(dpkg-query -W -f='${Status}' gdrive-linux)" = "install ok installed"
-          test "$(dpkg-query -W -f='${Version}' gdrive-linux)" = "0.10.0"
+          test "$(dpkg-query -W -f='${Version}' gdrive-linux)" = "0.11.0"
           test -x /usr/bin/gdrive-linux
-          dpkg-deb -f gdrive-linux_0.10.0_all.deb Depends | grep -q 'gir1.2-gtk-4.0'
-          ! dpkg-deb -f gdrive-linux_0.10.0_all.deb Depends | grep -q 'rclone'
-          dpkg-deb -f gdrive-linux_0.10.0_all.deb Recommends | grep -q 'rclone'
+          dpkg-deb -f gdrive-linux_0.11.0_all.deb Depends | grep -q 'gir1.2-gtk-4.0'
+          ! dpkg-deb -f gdrive-linux_0.11.0_all.deb Depends | grep -q 'rclone'
+          dpkg-deb -f gdrive-linux_0.11.0_all.deb Recommends | grep -q 'rclone'
           test -f /usr/share/gdrive-linux/gdrive-linux
+          test -f /usr/share/gdrive-linux/style.css
           test -f /usr/share/applications/gdrive-linux.desktop
       - uses: actions/upload-artifact@v4
         with:
           name: gdrive-linux-deb
-          path: gdrive-linux_0.10.0_all.deb
+          path: gdrive-linux_0.11.0_all.deb
