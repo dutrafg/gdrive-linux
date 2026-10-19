@@ -78,7 +78,8 @@ jobs:
           Section: utils
           Priority: optional
           Architecture: all
-          Depends: python3 (>= 3.9), python3-gi, gir1.2-gtk-4.0, rclone
+          Depends: python3 (>= 3.9), python3-gi, gir1.2-gtk-4.0
+          Recommends: rclone
           Maintainer: Drive para Linux <noreply@example.invalid>
           Description: Cliente grafico GTK4 para Google Drive usando rclone
           EOF
@@ -115,9 +116,12 @@ jobs:
         run: |
           set -eu
           sudo apt-get install -y ./gdrive-linux_0.10.0_all.deb
-          test "$(dpkg-query -W -f='\u0024{Status}' gdrive-linux)" = "install ok installed"
-          test "$(dpkg-query -W -f='\u0024{Version}' gdrive-linux)" = "0.10.0"
+          test "$(dpkg-query -W -f='${Status}' gdrive-linux)" = "install ok installed"
+          test "$(dpkg-query -W -f='${Version}' gdrive-linux)" = "0.10.0"
           test -x /usr/bin/gdrive-linux
+          dpkg-deb -f gdrive-linux_0.10.0_all.deb Depends | grep -q 'gir1.2-gtk-4.0'
+          ! dpkg-deb -f gdrive-linux_0.10.0_all.deb Depends | grep -q 'rclone'
+          dpkg-deb -f gdrive-linux_0.10.0_all.deb Recommends | grep -q 'rclone'
           test -f /usr/share/gdrive-linux/gdrive-linux
           test -f /usr/share/applications/gdrive-linux.desktop
       - uses: actions/upload-artifact@v4
