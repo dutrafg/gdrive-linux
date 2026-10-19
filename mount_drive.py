@@ -3,6 +3,7 @@ import argparse
 import os
 import re
 import shutil
+import subprocess
 from pathlib import Path
 
 from settings import load_settings
@@ -80,7 +81,7 @@ def main():
                     "Conta ausente no rclone deste serviço. Confira o remoto selecionado "
                     "e a localização do rclone.conf; nenhum arquivo foi modificado.")
         cmd = command(settings, require_tools=True, create=args.serve)
-    except (ValueError, RuntimeError, OSError) as exc:
+    except (ValueError, RuntimeError, OSError, subprocess.SubprocessError) as exc:
         parser.exit(1, "Drive para Linux: " + str(exc) + "\n")
     if args.check:
         print("Montagem disponível:", cmd[2])
