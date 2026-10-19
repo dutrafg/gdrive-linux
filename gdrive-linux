@@ -6,9 +6,9 @@ from pathlib import Path
 import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, GLib
-from rclone_backend import list_remotes, copy_command
+from rclone_backend import list_remotes, copy_command, list_files, remote_path
 
-VERSION = "0.2.1"
+VERSION = "0.3.0"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -82,7 +82,75 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.log.set_editable(False)
         self.log.set_monospace(True)
         scroll.set_child(self.log)
+        self.path_parts = []
+        browser_header = Gtk.Box(spacing=8)
+        root.append(browser_header)
+        self.back_button = Gtk.Button(label="Voltar")
+        self.back_button.connect("clicked", self.go_back)
+        browser_header.append(self.back_button)
+        self.path_label = Gtk.Label(label="Meu Drive")
+        self.path_label.set_hexpand(True)
+        self.path_label.set_xalign(0)
+        browser_header.append(self.path_label)
+        reload_button = Gtk.Button(label="Ver arquivos")
+        reload_button.connect("clicked", self.browse)
+        browser_header.append(reload_button)
+        self.files_list = Gtk.ListBox()
+        self.files_list.connect("row-activated", self.open_folder)
+        file_scroll = Gtk.ScrolledWindow()
+        file_scroll.set_min_content_height(140)
+        file_scroll.set_child(self.files_list)
+        root.append(file_scroll)
         self.refresh()
+
+    def selected_remote(self):
+        index = self.dropdown.get_selected()
+        if index == Gtk.INVALID_LIST_POSITION or index >= self.remotes.get_n_items():
+            return None
+        return self.remotes.get_string(index)
+
+    def browse(self, *_):
+        remote = self.selected_remote()
+        if not remote:
+            self.status.set_text("Configure uma conta antes de navegar.")
+            return
+        self.status.set_text("Carregando arquivos…")
+        self.path_label.set_text("Meu Drive / " + " / ".join(self.path_parts))
+        threading.Thread(target=self.browse_worker, args=(remote, "/".join(self.path_parts)), daemon=True).start()
+
+    def browse_worker(self, remote, relative):
+        try:
+            entries = list_files(remote, relative)
+            GLib.idle_add(self.show_files, entries)
+        except (OSError, subprocess.SubprocessError, ValueError) as exc:
+            GLib.idle_add(self.status.set_text, "Falha ao listar arquivos: " + str(exc))
+
+    def show_files(self, entries):
+        while row := self.files_list.get_row_at_index(0):
+            self.files_list.remove(row)
+        for entry in sorted(entries, key=lambda e: (not e["directory"], e["name"].casefold())):
+            row = Gtk.ListBoxRow()
+            row.entry_name = entry["name"]
+            row.is_directory = entry["directory"]
+            label = Gtk.Label(label=("📁 " if entry["directory"] else "📄 ") + entry["name"])
+            label.set_xalign(0)
+            label.set_margin_top(6)
+            label.set_margin_bottom(6)
+            label.set_margin_start(8)
+            row.set_child(label)
+            self.files_list.append(row)
+        self.status.set_text(f"{len(entries)} itens encontrados.")
+        return False
+
+    def open_folder(self, _listbox, row):
+        if row.is_directory:
+            self.path_parts.append(row.entry_name)
+            self.browse()
+
+    def go_back(self, *_):
+        if self.path_parts:
+            self.path_parts.pop()
+        self.browse()
 
     def choose_folder(self, *_):
         dialog = Gtk.FileChooserNative(title="Escolher pasta local", transient_for=self,
@@ -109,6 +177,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         try:
             names = list_remotes()
             self.remotes.splice(0, self.remotes.get_n_items(), names)
+            self.path_parts = [] if hasattr(self, "path_parts") else []
             if names:
                 self.dropdown.set_selected(0)
             else:
@@ -128,9 +197,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         if index == Gtk.INVALID_LIST_POSITION or index >= self.remotes.get_n_items():
             self.status.set_text("Configure uma conta primeiro.")
             return
-        remote = self.remotes.get_string(index) + ":"
         local = str(self.folder)
-        src, dst = (remote, local) if direction == "download" else (local, remote)
         try:
             command = copy_command(self.remotes.get_string(index), local, direction)
         except ValueError as exc:
