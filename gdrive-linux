@@ -144,7 +144,7 @@ class DriveWindow(Gtk.ApplicationWindow):
                 button.add_css_class("drive-selected")
         if not self.busy and not self.sync_busy:
             if page == "sync":
-                self.notice("Nenhuma transferência em andamento. Use Simular para consultar diferenças.")
+                self.notice("Sincronização contínua agendada; consulte o serviço." if self.auto_enabled else "Sincronização pausada. Use Simular para consultar diferenças.")
             elif page == "files":
                 self.notice("Navegação consulta arquivos; só os botões de transferência copiam dados.")
 
