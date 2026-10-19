@@ -5,8 +5,9 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
-Type=simple
+Type=notify
+NotifyAccess=main
 ExecStart=/usr/bin/python3 /usr/share/gdrive-linux/mount_drive.py --serve
-TimeoutStartSec=90
+TimeoutStartSec=120
 Restart=no
 Nice=5
