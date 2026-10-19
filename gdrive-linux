@@ -20,6 +20,9 @@ from mount_health import mount_diagnosis, mount_ready, service_state, service_jo
 from mount_autostart import autostart_enabled, update_autostart
 from sync_filters import parse_entry, parse_rules
 from sync_profiles import MODES, validate_profiles
+from filemanager_bookmarks import set_bookmark
+from google_docs_export import export_documents, export_folder
+from tray_autostart import set_indicator_autostart, indicator_enabled
 from photos_export import upload_media
 from desktop_files import find_openable_file
 from deletion_review import load_candidates, archive_deletion
@@ -111,6 +114,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             ("sync", "Sincronização", "emblem-synchronizing-symbolic"),
             ("activity", "Transferências", "folder-download-symbolic"),
             ("mount", "Disco virtual", "drive-harddisk-symbolic"),
+            ("docs", "Documentos Google", "x-office-document-symbolic"),
             ("photos", "Google Fotos", "camera-photo-symbolic"),
             ("history", "Histórico", "document-open-recent-symbolic"),
             ("settings", "Configurações", "emblem-system-symbolic"),
@@ -163,6 +167,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             "sync": ("Sincronização", "Compare e transfira arquivos novos com segurança."),
             "activity": ("Transferências", "Acompanhe o progresso e os registros do rclone."),
             "mount": ("Disco virtual", "Abra seu Drive diretamente no gerenciador de arquivos."),
+            "docs": ("Documentos Google", "Exporte Google Docs, Sheets e Slides em Office, ODF ou PDF."),
             "photos": ("Google Fotos", "Envio opcional de fotos e vídeos para um álbum."),
             "history": ("Histórico", "Operações desta sessão do aplicativo."),
             "settings": ("Configurações", "Preferências, automação e diagnóstico."),
@@ -211,6 +216,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.build_settings()
         self.build_mount()
         self.build_photos()
+        self.build_docs()
 
     def build_home(self):
         home = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
@@ -584,6 +590,10 @@ class DriveWindow(Gtk.ApplicationWindow):
         open_mount = action("Abrir disco no gerenciador", self.open_mount_folder,
                             "folder-open-symbolic")
         buttons = button_flow(start, stop, open_mount,
+                              action("Adicionar aos favoritos do Zorin Files",
+                                     self.bookmark_mount, "starred-symbolic"),
+                              action("Remover dos favoritos do gerenciador",
+                                     self.remove_bookmark_mount, "list-remove-symbolic"),
                               action("Aplicar gravação e remontar Drive",
                                      self.remount_drive, "view-refresh-symbolic", primary=True),
                               action("Diagnosticar erro de montagem",
