@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Drive para Linux — indicador
+Comment=Status da sincronização Google Drive no sistema
+Exec=/usr/bin/python3 /usr/share/gdrive-linux/tray_indicator.py
+Icon=folder-sync
+Terminal=false
+Categories=Network;Utility;
+X-GNOME-Autostart-enabled=true
+X-DriveLinux-Managed=true
