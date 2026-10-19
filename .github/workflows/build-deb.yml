@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Validate Python syntax
         run: |
           python3 -m py_compile gdrive-linux rclone_backend.py settings.py progress.py google_oauth.py sync_plan.py safe_sync.py background_sync.py sync_display.py mount_drive.py mount_health.py mount_checks.py photos_export.py desktop_files.py deletion_review.py diagnostics.py rclone_errors.py mount_autostart.py sync_filters.py sync_profiles.py filemanager_bookmarks.py google_docs_export.py tray_indicator.py tray_autostart.py ui_kit.py
@@ -18,7 +18,7 @@ jobs:
       - name: Install GTK4 Wayland test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 weston dbus-x11 rclone fuse3
+          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 weston dbus-x11 rclone fuse3 xvfb
       - name: Offline rclone transfer integration tests
         run: |
           /usr/bin/python3 -m unittest -v test_integration test_background_sync test_sync_profiles
@@ -70,7 +70,7 @@ jobs:
           fi
       - name: Upload GTK4 diagnostic log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: gtk4-smoke-diagnostics
           path: /tmp/gdrive-smoke.log
@@ -145,13 +145,21 @@ jobs:
           test -f /usr/share/gdrive-linux/mount_checks.py
           # Executed from the installed package, not the checked-out source tree.
           cd /tmp
+          # Launch the installed GTK4 binary, not only the repository copy.
+          xvfb-run -a -s "-screen 0 1366x768x24" \
+            dbus-run-session -- /usr/bin/gdrive-linux --ui-smoke \
+            > /tmp/gdrive-installed-ui.log 2>&1 || {
+              cat /tmp/gdrive-installed-ui.log
+              exit 1
+            }
+          cat /tmp/gdrive-installed-ui.log
           /usr/bin/python3 /usr/share/gdrive-linux/mount_checks.py > /tmp/gdrive-installed-preflight.txt
           grep -q 'rclone' /tmp/gdrive-installed-preflight.txt
           grep -q 'FUSE' /tmp/gdrive-installed-preflight.txt
           test -f /usr/share/gdrive-linux/google_docs_export.py
           test -f /usr/share/applications/gdrive-linux-indicator.desktop
           test -f /usr/share/applications/gdrive-linux.desktop
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: gdrive-linux-deb
           path: gdrive-linux_0.14.3_all.deb
