@@ -135,6 +135,11 @@ class DriveWindow(Gtk.ApplicationWindow):
             button.remove_css_class("drive-selected")
             if key == page:
                 button.add_css_class("drive-selected")
+        if not self.busy and not self.sync_busy:
+            if page == "sync":
+                self.notice("Nenhuma transferência em andamento. Use Simular para consultar diferenças.")
+            elif page == "files":
+                self.notice("Navegação consulta arquivos; só os botões de transferência copiam dados.")
 
     def make_columns(self, *cards):
         """One responsive FlowBox row with child widgets that report true height.
@@ -301,6 +306,9 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.auto_switch.connect("notify::active", self.auto_changed)
         auto_row.append(self.auto_switch)
         automatic.append(auto_row)
+        self.auto_info = label("Desativada. Nenhuma transferência em segundo plano.",
+                               "drive-muted", wrap=True)
+        automatic.append(self.auto_info)
         automatic.append(label("Não substitui arquivos locais existentes e não exclui arquivos.",
                                "drive-muted", wrap=True))
         manual = card("Sincronização seletiva",
@@ -715,6 +723,10 @@ class DriveWindow(Gtk.ApplicationWindow):
 
     def auto_changed(self, switch, *_):
         self.auto_enabled = switch.get_active()
+        self.auto_info.set_text(
+            "Ativada: verificação agendada a cada 5 minutos; nenhum download foi iniciado agora."
+            if self.auto_enabled else
+            "Desativada. Nenhuma transferência automática agendada.")
         self.auto_generation += 1
         generation = self.auto_generation
         if self.auto_enabled:
@@ -1115,6 +1127,10 @@ def ui_smoke():
         raise AssertionError("Action group must stack vertically")
     if not hasattr(window, "account_identity"):
         raise AssertionError("Account identity status missing")
+    if not hasattr(window, "account_connection"):
+        raise AssertionError("Account connection status missing")
+    if not hasattr(window, "auto_info"):
+        raise AssertionError("Automatic-download state label missing")
     window.close()
     print("GTK4 UI OK: navigation, cards, labels and defaults")
     return 0
