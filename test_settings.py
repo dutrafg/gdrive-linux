@@ -81,6 +81,31 @@ class SettingsTests(unittest.TestCase):
                 self.assertEqual(settings.CONFIG_FILE.stat().st_mode & 0o777, 0o600)
                 self.assertFalse(list(directory.glob(".settings-*")))
 
+    def test_rclone_config_path_persists_without_credentials(self):
+        with tempfile.TemporaryDirectory() as root:
+            directory = Path(root) / "config"
+            conf = Path(root) / "rclone.conf"
+            conf.write_text("[demo]\ntype=alias\nremote=/tmp\n", encoding="utf-8")
+            with patch.object(settings, "CONFIG_DIR", directory), patch.object(
+                    settings, "CONFIG_FILE", directory / "settings.json"):
+                settings.save_settings("/tmp/drive", "demo",
+                                       rclone_config_file=str(conf))
+                restored = settings.load_settings()
+                self.assertEqual(restored["rclone_config_file"], str(conf))
+                self.assertNotIn("token", settings.CONFIG_FILE.read_text(encoding="utf-8"))
+                self.assertEqual(settings.CONFIG_FILE.stat().st_mode & 0o777, 0o600)
+
+    def test_missing_rclone_config_keeps_other_preferences(self):
+        with tempfile.TemporaryDirectory() as root:
+            directory = Path(root) / "config"
+            with patch.object(settings, "CONFIG_DIR", directory), patch.object(
+                    settings, "CONFIG_FILE", directory / "settings.json"):
+                settings.save_settings("/tmp/drive", "demo",
+                                       rclone_config_file=str(Path(root) / "missing.conf"))
+                restored = settings.load_settings()
+                self.assertEqual(restored["account"], "demo")
+                self.assertEqual(restored["folder"], "/tmp/drive")
+
     def test_corrupt_settings(self):
         with tempfile.TemporaryDirectory() as temp:
             file = Path(temp) / "settings.json"
