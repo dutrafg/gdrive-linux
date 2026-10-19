@@ -1,55 +1,58 @@
 # Drive para Linux
 
-Cliente experimental **GTK4** para acessar o Google Drive no Linux usando **rclone**. Versão atual: **0.11.1 Alpha**. Não é um cliente oficial do Google.
+Cliente desktop experimental **GTK4 + rclone** para Google Drive em Linux. **Versão 0.11.1 Alpha**. Projeto independente, não oficial do Google.
 
-## Funcionalidades
+## Interface
 
-- Interface GTK4 redesenhada com **menu lateral**, **Início**, **Contas**, **Arquivos**, **Sincronização**, **Transferências** e **Histórico** da sessão, utilizando CSS nativo GTK4 e mantendo o rclone como mecanismo de transferência.
-- Seleção de contas configuradas no rclone, com atualização assíncrona sem bloquear a interface, e navegação por pastas remotas.
-- Upload e download manuais usando `rclone copy`.
-- Atualização automática opcional a cada cinco minutos **enquanto o aplicativo está aberto**, apenas da nuvem para a pasta local; não exclui arquivos e usa `--ignore-existing` para não substituir nenhum arquivo local existente; alterações remotas em arquivos já baixados não são aplicadas automaticamente.
-- Botão para abrir a pasta local no gerenciador padrão do ambiente Linux.
-- **Transferência bidirecional seletiva** de arquivos novos, sem exclusão e sem sobrescrita, limitada a 100 arquivos por operação. Conflitos são preservados e devem ser resolvidos manualmente. A operação é experimental e não representa sincronização completa.
-- **Simulação** de sincronização bidirecional: compara inventários e identifica arquivos exclusivos e conflitos sem transferir ou excluir arquivos. A comparação é conservadora: hashes de algoritmos diferentes são tratados como conflito, mesmo quando o conteúdo pode ser idêntico.
-- Barra de progresso baseada nas estatísticas do rclone, logs, estados de conclusão/falha/cancelamento e histórico **apenas da sessão**.
-- Pasta local configurável e preferências salvas em `~/.config/gdrive-linux/settings.json` (sem tokens OAuth).
+A navegação foi redesenhada para o estilo de aplicativo Linux corporativo: sidebar azul-escuro, conteúdo claro, cartões responsivos, botões por prioridade, estados visuais e ícones do sistema.
 
-**Importante:** o assistente é gráfico no GTK4, mas a autenticação efetiva é realizada no navegador pelo OAuth do rclone. Não há campos para senha Google. Os indicadores de uso da nuvem e outras métricas decorativas da imagem de referência não foram inventados; serão implementados quando houver dados reais.\n\n**Limitações:** não há sincronização bidirecional completa (somente transferência seletiva de arquivos exclusivos), sincronização em segundo plano com o aplicativo fechado, montagem virtual, login OAuth dentro da própria janela, sem navegador externo, histórico persistente ou integração profunda com gerenciador de arquivos. O aplicativo ainda precisa de validação funcional em diferentes distribuições.
+- **Início:** conta ativa, pasta local, situação da sincronização e última transferência (dados reais da sessão).
+- **Contas:** selecionar conta, iniciar o assistente Google, escolher, abrir ou criar a pasta local `~/GoogleDrive`.
+- **Arquivos:** navegar pelas pastas remotas, voltar, atualizar e visualizar nome/tamanho.
+- **Sincronização:** atualização automática opcional a cada cinco minutos (somente downloads novos), prévia de arquivos exclusivos, conflitos visíveis e transferência seletiva não destrutiva de até 100 arquivos.
+- **Transferências:** progresso real do rclone, cancelamento de cópias manuais e registros.
+- **Histórico:** lista de operações somente da sessão.
+- **Configurações:** diagnóstico do rclone, configuração avançada e avisos de segurança.
 
-## Instalação e execução
+Nenhum percentual de uso da nuvem ou transferência fictícia é apresentado. A interface é construída com widgets GTK4; o rclone faz acesso remoto e cópias.
 
-Em Debian/Ubuntu com GTK4:
+## Instalação no Zorin OS, Ubuntu e Debian
+
+Baixe o artefato aprovado na página de [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions), extraia o ZIP e instale o `gdrive-linux_0.11.1_all.deb`:
 
 ```bash
-sudo apt update
-sudo apt install python3 python3-gi gir1.2-gtk-4.0 rclone
-python3 gdrive-linux
+sudo apt install ./gdrive-linux_0.11.1_all.deb
 ```
 
-Para instalar o pacote `.deb`, baixe o artefato da execução aprovada em [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions) e instale com `sudo apt install ./gdrive-linux_0.11.0_all.deb`. O arquivo só estará disponível após o workflow gerar o artefato.
+O pacote requer Python 3, PyGObject e GTK4. A dependência `rclone` é **recomendada**, para permitir que a interface seja instalada mesmo quando o Zorin não oferece esse pacote nas fontes configuradas. **Sem o rclone, conexão e transferência não funcionam.** Confirme com `rclone version`; instruções oficiais: https://rclone.org/install/ .
 
-## Configuração da conta
+Para iniciar diretamente a partir do código-fonte, instale Python 3, GTK4 e rclone e execute `python3 gdrive-linux` na pasta do repositório.
 
-Em **Início → Conectar conta Google**, informe um nome novo para a conta. O Client ID próprio é **opcional**; por padrão usa-se o cliente OAuth fornecido pelo rclone. O aplicativo inicia o fluxo OAuth do rclone em segundo plano; a autorização ocorre no navegador padrão. Nenhuma senha ou token é coletado pela interface. Para configurar um cliente próprio, consulte [instruções do rclone](https://rclone.org/drive/#making-your-own-client-id). A autorização requer navegador e pode falhar por configuração incorreta do consentimento OAuth. Como alternativa, execute `rclone config` no terminal (ou use **Contas → Configurar**). Selecione o backend Google Drive e conclua a autorização OAuth no navegador pelo fluxo oficial do rclone. Volte ao aplicativo e clique em **Atualizar**. **Nunca digite sua senha Google dentro do Drive para Linux.** Não publique o arquivo `rclone.conf`.
+## Conectar o Google Drive
 
-Escolha uma pasta local existente em **Contas**. Antes de transferir arquivos importantes, teste com uma conta e pasta de teste e mantenha backup independente.
+Abra **Início → Conectar Google**. Informe o nome da conta e clique em **Iniciar autorização**. O GTK4 acompanha o procedimento, enquanto o **rclone abre o navegador padrão para a autorização OAuth**. O aplicativo não pede a senha Google e não mostra tokens.
 
-## Atenção aos dados
+**Atenção (2026):** a documentação do rclone informa que o **Client ID Google compartilhado está sendo descontinuado durante 2026**. Portanto, a opção padrão pode deixar de funcionar; pode ser necessário cadastrar credenciais OAuth próprias. Consulte https://rclone.org/drive/#making-your-own-client-id . O campo Client ID na janela é opcional, mas algumas configurações próprias também exigem Client Secret; nesses casos, utilize **Configurações → Configuração avançada (terminal)** até essa etapa ser integrada com segurança. Não cole a senha Google no aplicativo.
 
-`rclone copy` **não exclui automaticamente arquivos do destino**, mas **pode sobrescrever arquivos existentes**. Não confunda esta operação com backup versionado ou sincronização bidirecional. O botão Cancelar interrompe o processo, mas arquivos já copiados podem permanecer no destino.
+O assistente GUI e a abertura do navegador são automatizados, mas a autenticação real com uma conta Google **ainda requer homologação em Zorin OS**.
 
-## Testes e empacotamento
+## Integridade dos dados
 
-O workflow `.github/workflows/build-deb.yml` executa compilação sintática Python, testes unitários, testes de transferência real entre diretórios locais usando rclone (sem OAuth), incluindo erro de origem ausente e substituição de arquivos existentes, um teste de inicialização GTK4 em Wayland nativo usando Weston headless e cria, inspeciona e instala o pacote Debian em um ambiente Ubuntu de CI. **A existência do workflow não significa que todas as execuções passaram.** Consulte [Actions](https://github.com/dutrafg/gdrive-linux/actions) para o estado atual. GTK4 usa Wayland nativamente quando a sessão Linux oferece esse protocolo; o aplicativo não força X11 e mantém compatibilidade com ambientes X11. O teste de inicialização não substitui testes visuais em GNOME/KDE ou operações reais com uma conta Google.
+- **Download/upload manual:** usa `rclone copy`; não exclui arquivos mas **pode sobrescrever arquivos existentes**.
+- **Atualização automática:** usa `rclone copy --ignore-existing`, somente enquanto a janela estiver aberta; preserva arquivos já presentes no destino.
+- **Transferência seletiva:** usa `rclone copyto --ignore-existing`, sem exclusão nem sobrescrita intencional; compara inventários, conserva conflitos e limita lotes.
+- **Simulação:** mostra diferenças e até 50 conflitos, mas não altera arquivos.
+
+Não há sincronização bidirecional completa com resolução automática de conflitos, exclusões conciliadas, histórico persistente, montagem FUSE ou operação contínua com a janela fechada. Faça backup separado antes de copiar dados importantes.
+
+Preferências: `~/.config/gdrive-linux/settings.json`. Tokens OAuth são gerenciados pelo rclone em sua própria configuração. Nunca publique o arquivo `rclone.conf`.
+
+## Qualidade e testes
+
+O workflow `.github/workflows/build-deb.yml` usa Ubuntu CI para: sintaxe Python, testes unitários, integração rclone entre diretórios locais, inicialização GTK4 em Wayland/Weston, smoke de navegação GTK4, empacotamento, inspeção e instalação do `.deb`. **Só considere uma compilação aprovada quando a execução correspondente estiver verde.**
+
+O smoke GTK4 não equivale a avaliação visual humana nem a autenticação Google real; o teste no Zorin OS permanece necessário. Consulte [SECURITY.md](SECURITY.md) para questões de privacidade e segurança.
 
 ## Versionamento
 
-Até **0.11.0**, versões Alpha. **1.0.0 Beta** será o marco de início da fase Beta, sujeito a QA; depois seguem versões incrementais. Consulte [SECURITY.md](SECURITY.md) para cuidados de autenticação, permissões e divulgação de vulnerabilidades.
-
-## Zorin OS — dependência rclone indisponível
-
-Algumas instalações do Zorin OS não têm o pacote `rclone` disponível nas fontes APT configuradas. A partir da revisão do pacote **0.11.0 Alpha**, `rclone` é uma dependência **recomendada**, não obrigatória: o instalador gráfico poderá instalar a interface sem o rclone, mas **transferências e autenticação não funcionarão** até o rclone ser instalado separadamente.
-
-Verifique com `apt-cache policy rclone`. Se não houver candidato, confira as fontes de software da sua versão do Zorin OS e as instruções oficiais em https://rclone.org/install/ . Evite scripts de terceiros e não altere repositórios do sistema sem saber a versão-base do Ubuntu. Após instalar, execute `rclone version` para confirmar.
-
-A instalação do pacote em CI ocorre no Ubuntu, **não é um teste real no Zorin OS**. O problema específico deve ser revalidado em um computador com Zorin.
+Até a v0.11.1, o aplicativo permanece **Alpha**. A promoção para uma versão pré-estável ou Beta depende de QA, especialmente autenticação com conta Google, compatibilidade em Zorin OS e confiabilidade de cópias.
