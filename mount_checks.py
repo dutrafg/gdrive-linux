@@ -125,3 +125,8 @@ def test_google_read_access(remote, timeout=45):
         return False, "O Google não respondeu no prazo. Verifique a conexão antes de montar."
     except (OSError, ValueError, subprocess.SubprocessError):
         return False, "Não foi possível consultar a conta Google; verifique rclone e o remoto."
+
+
+if __name__ == "__main__":
+    from settings import load_settings
+    print(format_mount_report(inspect_mount(load_settings())))
