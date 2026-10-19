@@ -1,6 +1,7 @@
 """Non-destructive selective transfers; no delete or overwrite commands."""
 import subprocess
 from pathlib import Path
+from rclone_errors import rclone_limits, friendly, is_rate_limit
 from rclone_backend import remote_path
 from sync_plan import validate_relative, conservative_plan, local_inventory, remote_inventory
 
@@ -25,7 +26,8 @@ def copyto_command(remote, folder, relative, direction):
         source, dest = cloud, str(target)
     else:
         raise ValueError("Direção inválida")
-    return ["rclone", "copyto", source, dest, "--ignore-existing", "--retries", "2"]
+    return ["rclone", "copyto", source, dest, "--ignore-existing", "--retries", "2",
+            "--transfers", "1", "--checkers", "1"] + rclone_limits()
 
 def execute_additions(remote, folder, max_files=100, dry_run=True):
     """Re-scan before copying. Only unique paths; conflicts never touched."""
@@ -42,6 +44,9 @@ def execute_additions(remote, folder, max_files=100, dry_run=True):
     for command in commands:
         result = subprocess.run(command, capture_output=True, text=True, timeout=600)
         if result.returncode:
-            raise RuntimeError("Transferência interrompida após " + str(completed) + " arquivos; verifique os logs do rclone.")
+            raise RuntimeError(("Transferência interrompida após " + str(completed) +
+                                " arquivos. " + friendly(result.stderr)) if
+                               is_rate_limit(result.stderr) else
+                               "Transferência interrompida; confira a conta e tente mais tarde.")
         completed += 1
     return plan, completed
