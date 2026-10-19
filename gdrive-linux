@@ -734,25 +734,74 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.status.set_text("Falha ao abrir pasta: " + str(exc))
 
     def auto_changed(self, switch, *_):
-        self.auto_enabled = switch.get_active()
-        self.auto_info.set_text(
-            "Ativada: verificação agendada a cada 5 minutos; nenhum download foi iniciado agora."
-            if self.auto_enabled else
-            "Desativada. Nenhuma transferência automática agendada.")
-        self.auto_generation += 1
-        generation = self.auto_generation
-        if self.auto_enabled:
-            self.status.set_text("Atualização automática ativa nesta sessão.")
-            GLib.timeout_add_seconds(self.auto_interval_seconds, self.auto_tick, generation)
-        else:
-            self.status.set_text("Atualização automática desativada.")
+        if self.restoring_auto:
+            return
+        requested = switch.get_active()
+        if requested and (not self.selected_remote() or not self.folder.is_dir()):
+            self.notice("Selecione uma conta e uma pasta existente antes de ativar.", "warning")
+            self.restoring_auto = True
+            switch.set_active(False)
+            self.restoring_auto = False
+            return
+        self.auto_enabled = requested
+        self.persist()
+        self.auto_info.set_text("Configurando sincronização no Linux…")
+        threading.Thread(target=self.background_toggle_worker,
+                         args=(requested,), daemon=True).start()
 
-    def auto_tick(self, generation):
-        if not self.auto_enabled or generation != self.auto_generation:
+    def background_toggle_worker(self, requested):
+        success = False
+        try:
+            refresh = subprocess.run(["systemctl", "--user", "daemon-reload"],
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                     timeout=20)
+            if refresh.returncode:
+                raise RuntimeError("systemd do usuário indisponível")
+            option = "enable" if requested else "disable"
+            response = subprocess.run(["systemctl", "--user", option, "--now",
+                                        "gdrive-linux-sync.timer"],
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                       timeout=30)
+            if response.returncode:
+                raise RuntimeError("Não foi possível configurar a sincronização automática")
+            success = True
+            message = ("Sincronização contínua ativada. O serviço funciona com a janela fechada."
+                       if requested else "Sincronização contínua desativada.")
+        except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+            message = str(exc)
+        GLib.idle_add(self.background_toggle_complete, requested, success, message)
+
+    def background_toggle_complete(self, requested, success, message):
+        if self.auto_switch.get_active() != requested:
             return False
-        if not self.busy and not self.sync_busy and self.selected_remote() and self.folder.is_dir():
-            self.transfer(None, "download", automatic=True)
-        return True
+        if requested and not success:
+            self.auto_enabled = False
+            self.restoring_auto = True
+            self.auto_switch.set_active(False)
+            self.restoring_auto = False
+            self.persist()
+        self.auto_info.set_text(message)
+        self.notice(message, "success" if success else "warning")
+        self.update_background_status()
+        return False
+
+    def update_background_status(self, *_):
+        status = read_json(STATE_BASE / "latest.json")
+        state = status.get("state")
+        if not self.auto_enabled:
+            message = "Pausada. Nenhum ciclo automático programado."
+        elif state == "ok":
+            message = (str(status.get("copied", 0)) +
+                       " arquivo(s) no último ciclo. " + str(status.get("time", "")))
+        elif state == "conflicts":
+            message = (str(status.get("conflicts", 0)) +
+                       " conflito(s) pendente(s). " + str(status.get("time", "")))
+        elif state == "error":
+            message = "A última verificação falhou. Revise a conexão e a pasta."
+        else:
+            message = "Agendada; aguardando o primeiro ciclo do systemd."
+        self.background_status.set_text(message)
+        return False
 
     def connect_google(self, *_):
         """Native GTK wizard; rclone performs OAuth in the system browser."""
