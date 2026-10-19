@@ -50,7 +50,7 @@ class MountPreflightTests(unittest.TestCase):
         self.assertIn("Instale fuse3", text)
 
     @patch("mount_drive.os.getuid", return_value=-1)
-    def test_root_owned_empty_mount_folder_rejected(self):
+    def test_root_owned_empty_mount_folder_rejected(self, getuid):
         with tempfile.TemporaryDirectory() as tmp:
             online = Path(tmp) / "virtual"
             (online / "demo").mkdir(parents=True)
