@@ -29,6 +29,19 @@ def classify_mount_error(logs):
                                       "fusermount: exit status 1", "operation not permitted")):
         return ("O Linux bloqueou a montagem FUSE. Confira /dev/fuse, fuse3 "
                 "e as permissões/AppArmor do Zorin OS.")
+    if "conta ausente no rclone" in lower or "didn't find section in config file" in lower:
+        return ("A conta selecionada não existe no rclone usado pelo serviço. "
+                "Abra Contas, verifique o remoto e confira o arquivo rclone.conf.")
+    if ("pasta online pertence a outro usuário" in lower or
+            "sem permissão de escrita na pasta de montagem" in lower):
+        return ("A pasta da unidade virtual tem proprietário/permissões incorretos. "
+                "Ajuste apenas ~/DriveOnline/<conta>, sem modificar arquivos do Drive.")
+    if ("failed to connect to bus" in lower or "no medium found" in lower):
+        return ("systemd de usuário não está acessível. Entre na sessão gráfica "
+                "normal do Zorin antes de iniciar a montagem.")
+    if ("snap" in lower and ("permission denied" in lower or "not allowed" in lower)):
+        return ("A instalação Snap do rclone pode impedir acesso ao FUSE. "
+                "Utilize uma instalação de rclone compatível com FUSE no Linux.")
     if "directory is not empty" in lower or "mountpoint is not empty" in lower:
         return ("A pasta de montagem contém arquivos; escolha uma pasta vazia "
                 "antes de tentar montar novamente.")
@@ -49,7 +62,9 @@ def classify_mount_error(logs):
     if "fusermount" in lower and ("not found" in lower or "no such file" in lower):
         return ("O comando fusermount não está disponível. Instale fuse3 "
                 "e verifique o PATH do serviço.")
-    if "rclone" in lower and ("not found" in lower or "no such file" in lower):
+    if (("rclone" in lower and ("not found" in lower or "no such file" in lower))
+            or "rclone não encontrado no path" in lower):
+
         return "rclone não disponível para o serviço systemd. Verifique a instalação."
     return ("O serviço não concluiu a montagem. Abra Configurações → Diagnóstico "
             "ou consulte o status do serviço com systemctl --user status " + SERVICE + ".")
