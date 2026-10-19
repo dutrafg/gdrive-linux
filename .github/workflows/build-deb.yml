@@ -10,8 +10,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate Python syntax
         run: |
-          python3 -m py_compile gdrive-linux rclone_backend.py settings.py progress.py google_oauth.py
-          python3 -m unittest -v test_backend test_settings test_progress test_google_oauth
+          python3 -m py_compile gdrive-linux rclone_backend.py settings.py progress.py google_oauth.py sync_plan.py
+          python3 -m unittest -v test_backend test_settings test_progress test_google_oauth test_sync_plan
       - name: Install GTK4 Wayland test dependencies
         run: |
           sudo apt-get update
@@ -68,11 +68,12 @@ jobs:
           cp settings.py pkg/usr/share/gdrive-linux/settings.py
           cp progress.py pkg/usr/share/gdrive-linux/progress.py
           cp google_oauth.py pkg/usr/share/gdrive-linux/google_oauth.py
+          cp sync_plan.py pkg/usr/share/gdrive-linux/sync_plan.py
           printf '#!/bin/sh\nexec /usr/bin/python3 /usr/share/gdrive-linux/gdrive-linux "$@"\n' > pkg/usr/bin/gdrive-linux
           chmod 755 pkg/usr/bin/gdrive-linux
           cat > pkg/DEBIAN/control <<'EOF'
           Package: gdrive-linux
-          Version: 0.9.8
+          Version: 0.9.9
           Section: utils
           Priority: optional
           Architecture: all
@@ -89,28 +90,29 @@ jobs:
           Categories=Network;FileTransfer;
           Terminal=false
           EOF
-          dpkg-deb --build pkg gdrive-linux_0.9.8_all.deb
+          dpkg-deb --build pkg gdrive-linux_0.9.9_all.deb
       - name: Validate Debian package metadata and contents
         run: |
           set -eu
-          dpkg-deb --info gdrive-linux_0.9.8_all.deb
-          dpkg-deb --contents gdrive-linux_0.9.8_all.deb
-          test "$(dpkg-deb -f gdrive-linux_0.9.8_all.deb Package)" = "gdrive-linux"
-          test "$(dpkg-deb -f gdrive-linux_0.9.8_all.deb Version)" = "0.9.8"
+          dpkg-deb --info gdrive-linux_0.9.9_all.deb
+          dpkg-deb --contents gdrive-linux_0.9.9_all.deb
+          test "$(dpkg-deb -f gdrive-linux_0.9.9_all.deb Package)" = "gdrive-linux"
+          test "$(dpkg-deb -f gdrive-linux_0.9.9_all.deb Version)" = "0.9.9"
           mkdir -p /tmp/gdrive-deb-check
-          dpkg-deb -x gdrive-linux_0.9.8_all.deb /tmp/gdrive-deb-check
+          dpkg-deb -x gdrive-linux_0.9.9_all.deb /tmp/gdrive-deb-check
           test -x /tmp/gdrive-deb-check/usr/bin/gdrive-linux
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/gdrive-linux
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/rclone_backend.py
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/settings.py
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/progress.py
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/google_oauth.py
+          test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/sync_plan.py
           test -f /tmp/gdrive-deb-check/usr/share/applications/gdrive-linux.desktop
           python3 -m py_compile /tmp/gdrive-deb-check/usr/share/gdrive-linux/gdrive-linux
       - name: Install Debian package and verify launcher
         run: |
           set -eu
-          sudo apt-get install -y ./gdrive-linux_0.9.8_all.deb
+          sudo apt-get install -y ./gdrive-linux_0.9.9_all.deb
           dpkg-query -W -f='Status Version\n' gdrive-linux
           test -x /usr/bin/gdrive-linux
           test -f /usr/share/gdrive-linux/gdrive-linux
@@ -118,4 +120,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: gdrive-linux-deb
-          path: gdrive-linux_0.9.8_all.deb
+          path: gdrive-linux_0.9.9_all.deb
