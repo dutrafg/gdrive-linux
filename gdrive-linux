@@ -11,7 +11,7 @@ from rclone_backend import list_remotes, copy_command, list_files
 from settings import load_settings, save_settings
 from progress import parse_progress
 
-VERSION = "0.8.0"
+VERSION = "0.9.0"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -124,7 +124,10 @@ class DriveWindow(Gtk.ApplicationWindow):
         activity_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         activity_page.append(log_label)
         self.history = Gtk.ListBox()
-        activity_page.append(self.history)
+        history_scroll = Gtk.ScrolledWindow()
+        history_scroll.set_min_content_height(110)
+        history_scroll.set_child(self.history)
+        activity_page.append(history_scroll)
         self.current_history = None
         scroll.set_min_content_height(110)
         activity_page.append(scroll)
@@ -352,7 +355,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.current_history = None
         self.busy = False
         self.progress.set_fraction(0)
-        self.progress.set_text("Transferência finalizada")
+        self.progress.set_text(self.status.get_text())
         self.download.set_sensitive(True)
         self.upload.set_sensitive(True)
         self.cancel_button.set_sensitive(False)
