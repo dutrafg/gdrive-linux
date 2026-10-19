@@ -6,7 +6,7 @@ Streaming/espelhamento: https://support.google.com/drive/answer/13401938?hl=pt-B
 O Drive para Linux é um aplicativo **independente**, GTK4 com rclone, e não
 distribui marca, ícones ou código proprietário do Google.
 
-| Recurso | Drive para computador (Windows) | Drive para Linux 0.13.0 |
+| Recurso | Drive para computador (Windows) | Drive para Linux 0.13.1 |
 | --- | --- | --- |
 | Autorização Google | navegador oficial | assistente GTK4 inicia OAuth pelo rclone no navegador; homologação real pendente |
 | Contas múltiplas | sim | gerencia múltiplos remotes rclone; **um remoto ativo por sincronização automática** |
@@ -46,3 +46,7 @@ O visual aproxima-se de um cliente de desktop com painel lateral, arquivos,
 status, contas, sincronização e busca, mas **não é uma cópia pixel a pixel
 do cliente proprietário do Google**. Ícones e recursos usam GTK4 e elementos
 disponíveis para Linux. Não alegar equivalência 1:1 de produto.
+
+## Nota de compatibilidade v0.13.1
+
+A montagem FUSE permite criar, editar e excluir arquivos **apenas após o usuário ativar gravação e remontar o disco virtual**. O espelhamento local segue editável como pasta normal do Linux; conciliação de exclusões exige opt-in com arquivamento recuperável. Não é um substituto exato para a lixeira e para a presença colaborativa do Google Drive para Windows. A API do Google pode bloquear gravações quando a cota OAuth compartilhada está esgotada.
