@@ -90,6 +90,46 @@ class SafePlanTests(unittest.TestCase):
                              "folder": str(Path.home())})
         remotes.assert_not_called()
 
+    @patch("background_sync.inventories")
+    @patch("background_sync.transfer_one", side_effect=RuntimeError(
+        "API do Google Drive bloqueou consultas (403)"))
+    @patch("background_sync.list_remotes", return_value=["qa_cloud"])
+    def test_transfer_error_not_hidden_by_failed_rescan(self, remotes, transfer, inventory):
+        with tempfile.TemporaryDirectory() as root:
+            local = Path(root) / "local"
+            local.mkdir()
+            (local / "file.txt").write_text("contents", encoding="utf-8")
+            inventory.side_effect = [
+                ({"file.txt": MD5_A}, {}),
+                RuntimeError("secondary inventory timeout"),
+            ]
+            with self.assertRaisesRegex(RuntimeError, "403"):
+                run_once(
+                    config={"auto_sync_enabled": True, "account": "qa_cloud",
+                            "folder": str(local)},
+                    state_base=Path(root) / "state",
+                    backup_base=Path(root) / "backups")
+            transfer.assert_called_once()
+
+    @patch("background_sync.inventories")
+    @patch("background_sync.transfer_one")
+    @patch("background_sync.list_remotes", return_value=["qa_cloud"])
+    def test_rescan_failure_still_fails_when_transfer_succeeds(self, remotes, transfer, inventory):
+        with tempfile.TemporaryDirectory() as root:
+            local = Path(root) / "local"
+            local.mkdir()
+            inventory.side_effect = [
+                ({"file.txt": MD5_A}, {}),
+                RuntimeError("remote unavailable"),
+            ]
+            with self.assertRaisesRegex(RuntimeError, "remote unavailable"):
+                run_once(
+                    config={"auto_sync_enabled": True, "account": "qa_cloud",
+                            "folder": str(local)},
+                    state_base=Path(root) / "state",
+                    backup_base=Path(root) / "backups")
+            transfer.assert_called_once()
+
     def test_disabled_job_does_no_io(self):
         with patch("background_sync.list_remotes") as remotes:
             self.assertEqual(run_once(config={"auto_sync_enabled": False})["state"],
@@ -184,6 +224,18 @@ class RcloneMirrorIntegrationTests(unittest.TestCase):
         self.assertEqual(result["archived"], 1)
         self.assertFalse((self.cloud / "document.txt").exists())
         self.assertTrue(list((self.cloud / ".gdrive-linux-history").rglob("document.txt")))
+
+    def test_edit_during_archival_preserves_new_local_file(self):
+        from background_sync import archive_unilateral_deletions
+        (self.folder / "keep.txt").write_text("new content", encoding="utf-8")
+        # The inventory reports the prior version, but the file changed before
+        # the archive action: it must stay visible to the user.
+        result = archive_unilateral_deletions(
+            "qa_cloud", self.folder, {"keep.txt": MD5_A}, {},
+            {"keep.txt": MD5_A[1]}, "test-run", self.backups)
+        self.assertEqual(result, [])
+        self.assertEqual((self.folder / "keep.txt").read_text(), "new content")
+        self.assertFalse(list(self.backups.rglob("keep.txt")))
 
     def test_opt_in_cloud_deletion_archives_local_copy(self):
         (self.folder / "document.txt").write_text("recover me", encoding="utf-8")
