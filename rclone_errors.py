@@ -14,7 +14,8 @@ def is_rate_limit(message):
     return any(x in lower for x in (
         "ratelimitexceeded", "rate_limit_exceeded",
         "userratelimitexceeded", "userqueriesperminuteperproject",
-        "quota exceeded", "quota_exceeded", "too many requests"
+        "quota exceeded", "quota_exceeded", "too many requests",
+        "api do google drive bloqueou consultas"
     ))
 
 def friendly(message):
