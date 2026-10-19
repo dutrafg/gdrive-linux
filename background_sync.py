@@ -384,7 +384,9 @@ def main():
     if not args.dry_run:
         notify_if_changed(previous, status)
     print(json.dumps(status, ensure_ascii=False))
-    return 0
+    # Let systemd distinguish an actually failed cycle from a successful
+    # process invocation. Pending batches and conflicts are recoverable states.
+    return 1 if status.get("state") in ("error", "quota") else 0
 
 if __name__ == "__main__":
     raise SystemExit(main())
