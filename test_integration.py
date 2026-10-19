@@ -72,5 +72,22 @@ class LocalTransferTests(unittest.TestCase):
             self.assertTrue((destination / "new.txt").exists())
 
 
+
+    def test_automatic_download_preserves_existing_file(self):
+        with tempfile.TemporaryDirectory() as root:
+            base = Path(root)
+            source, destination = base / "cloud", base / "local"
+            source.mkdir()
+            destination.mkdir()
+            (source / "same.txt").write_text("cloud", encoding="utf-8")
+            (destination / "same.txt").write_text("local edits", encoding="utf-8")
+            (source / "new.txt").write_text("new from cloud", encoding="utf-8")
+            cmd = copy_command("placeholder", destination, "download", skip_existing=True)
+            cmd[2] = str(source)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=45)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((destination / "same.txt").read_text(encoding="utf-8"), "local edits")
+            self.assertEqual((destination / "new.txt").read_text(encoding="utf-8"), "new from cloud")
+
 if __name__ == "__main__":
     unittest.main()
