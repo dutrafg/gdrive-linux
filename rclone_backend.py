@@ -30,7 +30,7 @@ def list_files(remote, relative='', timeout=60):
              'size': item.get('Size', 0)} for item in entries
             if isinstance(item, dict) and isinstance(item.get('Name'), str)]
 
-def copy_command(remote, local_folder, direction):
+def copy_command(remote, local_folder, direction, preserve_newer=False):
     if direction not in ('upload', 'download'):
         raise ValueError('Direção inválida')
     local = Path(local_folder).expanduser()
@@ -38,5 +38,10 @@ def copy_command(remote, local_folder, direction):
         raise ValueError('Pasta local não existe')
     cloud = remote_path(remote)
     source, dest = (str(local), cloud) if direction == 'upload' else (cloud, str(local))
-    return ['rclone', 'copy', source, dest, '--stats', '1s', '--stats-one-line', '--stats-log-level', 'NOTICE', '--log-level', 'NOTICE',
-            '--retries', '3', '--low-level-retries', '5']
+    command = ['rclone', 'copy', source, dest, '--stats', '1s', '--stats-one-line', '--stats-log-level', 'NOTICE', '--log-level', 'NOTICE',
+               '--retries', '3', '--low-level-retries', '5']
+    if preserve_newer:
+        if direction != 'download':
+            raise ValueError('Proteção automática disponível somente para download')
+        command.append('--update')
+    return command
