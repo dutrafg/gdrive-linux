@@ -9,7 +9,7 @@ from gi.repository import Gtk, GLib
 from rclone_backend import list_remotes, copy_command, list_files
 from settings import load_settings, save_settings
 
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -18,6 +18,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.proc = None
         self.busy = False
         self.preferences = load_settings()
+        self.restoring_accounts = False
         self.cancel_requested = False
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         root.set_margin_top(20)
@@ -115,9 +116,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.progress.set_text("Aguardando transferência")
         root.append(self.progress)
         self.browse_generation = 0
-        self.refresh()
         self.dropdown.connect("notify::selected", self.account_changed)
-        self.restore_account()
+        self.refresh()
 
     def restore_account(self):
         account = self.preferences.get("account", "")
@@ -133,6 +133,8 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.status.set_text("Não foi possível salvar preferências: " + str(exc))
 
     def account_changed(self, *_):
+        if self.restoring_accounts:
+            return
         self.persist()
         self.path_parts = []
         self.browse_generation += 1
@@ -223,12 +225,15 @@ class DriveWindow(Gtk.ApplicationWindow):
     def refresh(self, *_):
         try:
             names = list_remotes()
+            current = self.selected_remote() or self.preferences.get("account", "")
+            self.restoring_accounts = True
             self.remotes.splice(0, self.remotes.get_n_items(), names)
             self.path_parts = []
             self.browse_generation += 1
-            self.restore_account()
             if names:
-                self.dropdown.set_selected(0)
+                self.dropdown.set_selected(names.index(current) if current in names else 0)
+            self.restoring_accounts = False
+            self.account_changed()
             else:
                 self.status.set_text("Nenhuma conta configurada. Clique em Configurar.")
         except (OSError, subprocess.SubprocessError) as exc:
@@ -276,14 +281,18 @@ class DriveWindow(Gtk.ApplicationWindow):
             if self.cancel_requested:
                 GLib.idle_add(self.status.set_text, "Transferência cancelada.")
                 return
-            self.proc = subprocess.Popen(
+            proc = subprocess.Popen(
                 command,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-            for line in self.proc.stdout:
+            self.proc = proc
+            if self.cancel_requested:
+                proc.terminate()
+            for line in proc.stdout:
                 GLib.idle_add(self.append, line.rstrip())
-            code = self.proc.wait()
+            code = proc.wait()
             GLib.idle_add(self.status.set_text,
-                          "Transferência concluída." if code == 0 else f"Transferência encerrada (código {code}).")
+                          "Transferência cancelada." if self.cancel_requested else
+                          ("Transferência concluída." if code == 0 else f"Transferência encerrada (código {code})."))
         except OSError as exc:
             GLib.idle_add(self.status.set_text, str(exc))
         finally:
