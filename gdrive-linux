@@ -13,7 +13,7 @@ from progress import parse_progress
 from google_oauth import google_config_command, verify_google_remote
 from sync_plan import local_inventory, remote_inventory, conservative_plan
 from safe_sync import execute_additions
-from ui_kit import label, card, action, nav, format_size, section_title, row
+from ui_kit import label, card, action, nav, format_size, section_title, row, button_flow
 
 VERSION = "0.11.1"
 
@@ -206,16 +206,16 @@ class DriveWindow(Gtk.ApplicationWindow):
             "folder-symbolic")
         self.folder_label = label(str(self.folder), "drive-path", wrap=True)
         folder_card.append(self.folder_label)
-        folder_buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        folder_buttons.append(action("Escolher", self.choose_folder, "folder-open-symbolic"))
-        folder_buttons.append(action("Abrir", self.open_local_folder, "go-jump-symbolic"))
-        folder_buttons.append(action("Criar pasta padrão", self.create_default_folder, "folder-new-symbolic"))
+        folder_buttons = button_flow(
+            action("Escolher", self.choose_folder, "folder-open-symbolic"),
+            action("Abrir", self.open_local_folder, "go-jump-symbolic"),
+            action("Criar pasta padrão", self.create_default_folder, "folder-new-symbolic"))
         folder_card.append(folder_buttons)
         accounts_page.append(self.make_columns(account_card, folder_card))
         manual = card("Transferências manuais",
             "Atenção: transferências manuais podem substituir arquivos com o mesmo nome.",
             "folder-download-symbolic")
-        manual_buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        manual_buttons = button_flow()
         self.download = action("Baixar da nuvem", lambda *_: self.confirm_transfer("download"),
                                "go-down-symbolic", primary=True)
         self.upload = action("Enviar para nuvem", lambda *_: self.confirm_transfer("upload"),
@@ -279,7 +279,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             "emblem-synchronizing-symbolic")
         self.sync_report = label("Nenhuma simulação executada.", "drive-muted", wrap=True)
         manual.append(self.sync_report)
-        sync_actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        sync_actions = button_flow()
         sync_actions.append(action("Simular", self.preview_sync, "system-search-symbolic"))
         sync_actions.append(action("Transferir novos", self.safe_sync,
                                    "go-next-symbolic", primary=True))
