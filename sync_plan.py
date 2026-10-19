@@ -1,6 +1,7 @@
 """Non-destructive synchronization planning and conflict detection."""
 from dataclasses import dataclass
 from pathlib import Path
+from rclone_errors import rclone_limits
 import hashlib
 import json
 import subprocess
@@ -52,7 +53,7 @@ def remote_inventory(remote, timeout=120):
     from rclone_backend import remote_path
     cmd = ["rclone", "lsjson", remote_path(remote), "--recursive", "--files-only",
            "--hash", "--exclude", "/.gdrive-linux-history/**",
-           "--exclude", "/.gdrive-linux-backups/**"]
+           "--exclude", "/.gdrive-linux-backups/**"] + rclone_limits()
     result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=timeout)
     records = json.loads(result.stdout)
     if not isinstance(records, list):
