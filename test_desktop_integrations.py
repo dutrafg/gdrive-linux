@@ -95,7 +95,8 @@ class AutoMountTests(unittest.TestCase):
         enabled, _ = update_autostart(False, runner=run)
         self.assertFalse(enabled)
         self.assertIn("disable",calls[1])
-        self.assertIn("stop",calls[2])
+        self.assertEqual(len(calls), 2)
+        self.assertNotIn("stop", [item for cmd in calls for item in cmd])
 
 if __name__ == "__main__":
     unittest.main()
