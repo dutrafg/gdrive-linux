@@ -39,9 +39,8 @@ def update_autostart(enable, runner=None):
                       "o serviço tentará novamente. Verifique o diagnóstico FUSE.")
     if not systemctl_call(["disable", UNIT], runner=runner):
         return True, "Não foi possível desabilitar a montagem automática."
-    # Stop the existing mount as well; systemd waits for rclone to terminate.
-    stopped = systemctl_call(["stop", UNIT], timeout=45, runner=runner)
-    if not stopped:
-        return False, ("Montagem automática desabilitada para as próximas sessões, "
-                       "mas a desmontagem atual não foi concluída.")
-    return False, "Montagem automática desativada e unidade desmontada."
+    # Disabling login autostart must not kill an active FUSE mount.
+    # There may still be buffered writes; unmount only via an explicit user
+    # action after documents and rclone cache are finished.
+    return False, ("Montagem automática desativada para as próximas sessões. "
+                   "O disco já montado permanece ativo até você desmontá-lo.")
