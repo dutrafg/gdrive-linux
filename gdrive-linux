@@ -2569,6 +2569,14 @@ def ui_smoke():
         raise AssertionError("Responsive action group must be a GTK Box")
     if actions.get_orientation() != Gtk.Orientation.VERTICAL:
         raise AssertionError("Action group must stack vertically")
+    window.busy = True
+    if not window.profile_edit_blocked():
+        raise AssertionError("Profile edits must be locked during transfers")
+    window.busy = False
+    window.sync_busy = True
+    if not window.profile_edit_blocked():
+        raise AssertionError("Profile edits must be locked during selective copy")
+    window.sync_busy = False
     if not hasattr(window, "account_identity"):
         raise AssertionError("Account identity status missing")
     if not hasattr(window, "account_connection"):
