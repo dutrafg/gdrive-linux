@@ -71,7 +71,7 @@ jobs:
           chmod 755 pkg/usr/bin/gdrive-linux
           cat > pkg/DEBIAN/control <<'EOF'
           Package: gdrive-linux
-          Version: 0.9.3
+          Version: 0.9.4
           Section: utils
           Priority: optional
           Architecture: all
@@ -88,8 +88,32 @@ jobs:
           Categories=Network;FileTransfer;
           Terminal=false
           EOF
-          dpkg-deb --build pkg gdrive-linux_0.9.3_all.deb
+          dpkg-deb --build pkg gdrive-linux_0.9.4_all.deb
+      - name: Validate Debian package metadata and contents
+        run: |
+          set -eu
+          dpkg-deb --info gdrive-linux_0.9.4_all.deb
+          dpkg-deb --contents gdrive-linux_0.9.4_all.deb
+          test "$(dpkg-deb -f gdrive-linux_0.9.4_all.deb Package)" = "gdrive-linux"
+          test "$(dpkg-deb -f gdrive-linux_0.9.4_all.deb Version)" = "0.9.4"
+          mkdir -p /tmp/gdrive-deb-check
+          dpkg-deb -x gdrive-linux_0.9.4_all.deb /tmp/gdrive-deb-check
+          test -x /tmp/gdrive-deb-check/usr/bin/gdrive-linux
+          test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/gdrive-linux
+          test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/rclone_backend.py
+          test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/settings.py
+          test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/progress.py
+          test -f /tmp/gdrive-deb-check/usr/share/applications/gdrive-linux.desktop
+          python3 -m py_compile /tmp/gdrive-deb-check/usr/share/gdrive-linux/gdrive-linux
+      - name: Install Debian package and verify launcher
+        run: |
+          set -eu
+          sudo apt-get install -y ./gdrive-linux_0.9.4_all.deb
+          dpkg-query -W -f='Status Version\n' gdrive-linux
+          test -x /usr/bin/gdrive-linux
+          test -f /usr/share/gdrive-linux/gdrive-linux
+          test -f /usr/share/applications/gdrive-linux.desktop
       - uses: actions/upload-artifact@v4
         with:
           name: gdrive-linux-deb
-          path: gdrive-linux_0.9.3_all.deb
+          path: gdrive-linux_0.9.4_all.deb
