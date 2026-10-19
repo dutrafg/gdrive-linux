@@ -1,6 +1,6 @@
 # Política de segurança — Drive para Linux
 
-**Estado:** 0.11.2 Alpha, software experimental. Não há auditoria de segurança independente nem garantia de uso em produção.
+**Estado:** 0.12.0 Alpha, software experimental. Não há auditoria de segurança independente nem garantia de uso em produção.
 
 ## Reportar vulnerabilidades
 
@@ -21,7 +21,7 @@ Informe versão, distribuição Linux, passos de reprodução, impacto e registr
 - A transferência atual usa `rclone copy` com argumentos passados como lista, sem shell.
 - `copy` não remove arquivos ausentes na origem, mas **pode substituir arquivos no destino**. Faça backups e teste em diretórios descartáveis.
 - O cancelamento pode deixar arquivos já copiados. Não há reversão transacional nem resolução automática de conflitos.
-- A atualização automática opcional executa cópia da nuvem para a pasta local a cada cinco minutos enquanto a janela está aberta; usa `rclone copy --ignore-existing` para preservar arquivos locais existentes independentemente de horário; arquivos remotos modificados não substituem cópias locais; não faz exclusão automática. A simulação bidirecional não altera dados. O botão de transferência seletiva executa apenas `rclone copyto --ignore-existing` para arquivos exclusivos de cada lado, com limite de 100 arquivos; não há exclusão nem resolução automática de conflitos. Mudanças concorrentes durante a execução e falhas parciais ainda exigem conferência manual.
+- A sincronização contínua é opcional e utiliza um timer systemd do usuário. Ela propaga criações e edições unilaterais usando um histórico de hashes MD5, executa backups de versões anteriores antes de substituir um arquivo alterado e preserva conflitos e exclusões sem propagação automática. A função exige a sessão Linux ativa e pode rodar com a janela fechada. A simulação bidirecional não altera dados. O botão de transferência seletiva executa apenas `rclone copyto --ignore-existing` para arquivos exclusivos de cada lado, com limite de 100 arquivos; não há exclusão nem resolução automática de conflitos. Mudanças concorrentes durante a execução e falhas parciais ainda exigem conferência manual.
 - Escolha uma pasta local existente, com permissões adequadas. Não execute o aplicativo como root.
 
 ## Armazenamento local
@@ -41,3 +41,12 @@ Informe versão, distribuição Linux, passos de reprodução, impacto e registr
 ## Recomendações ao testar
 
 Use uma conta e pasta de testes, confirme origem e destino, mantenha backup separado e examine o resultado antes de repetir uma operação. Relate qualquer sobrescrita inesperada ou problema de autorização pelo canal privado de segurança.
+
+## Serviço de sincronização contínua (v0.12.0)
+
+- A ativação exige selecionar uma conta remota e uma pasta local existentes. O botão da interface ativa um `systemd --user` timer; o daemon confere a preferência salva e retorna sem fazer nada se desativado.
+- O daemon usa bloqueio exclusivo para impedir execuções simultâneas **do próprio serviço**. Transferências manuais iniciadas separadamente ainda exigem cuidado: evite usar os botões manuais enquanto a rotina automática estiver ativa.
+- O último estado é salvo sob `~/.local/state/gdrive-linux` com permissão restrita; backups de versões anteriores podem conter dados sensíveis e ocupar disco/nuvem. Faça limpeza manual somente depois de verificar a integridade dos arquivos.
+- Mudanças concorrentes durante uma transferência, interrupções inesperadas, arquivos Google Docs sem MD5 comparável ou falta de espaço são limitações conhecidas. O serviço não fornece uma garantia transacional de integridade nem substitui um backup independente.
+- A integração usa comandos rclone com lista de argumentos, sem senha ou tokens na linha de comando. Nenhum arquivo é intencionalmente excluído do Drive por este sincronizador.
+- As funcionalidades nativas exclusivas do cliente Google para Windows (presença colaborativa no Microsoft Office, Google Photos, streaming/FUSE, etc.) não são equivalentes às funções do rclone; não alegar paridade completa.
