@@ -8,6 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate Python syntax
+        run: python3 -m py_compile gdrive-linux
       - name: Package
         run: |
           mkdir -p pkg/DEBIAN pkg/usr/bin pkg/usr/share/applications
@@ -15,13 +17,13 @@ jobs:
           chmod 755 pkg/usr/bin/gdrive-linux
           cat > pkg/DEBIAN/control <<'EOF'
           Package: gdrive-linux
-          Version: 0.1.1
+          Version: 0.2.0
           Section: utils
           Priority: optional
           Architecture: all
-          Depends: python3 (>= 3.9), python3-gi, gir1.2-gtk-3.0, rclone
+          Depends: python3 (>= 3.9), python3-gi, gir1.2-gtk-4.0, rclone
           Maintainer: Drive para Linux <noreply@example.invalid>
-          Description: Cliente grafico simples para Google Drive usando rclone
+          Description: Cliente grafico GTK4 para Google Drive usando rclone
           EOF
           cat > pkg/usr/share/applications/gdrive-linux.desktop <<'EOF'
           [Desktop Entry]
@@ -32,8 +34,8 @@ jobs:
           Categories=Network;FileTransfer;
           Terminal=false
           EOF
-          dpkg-deb --build pkg gdrive-linux_0.1.1_all.deb
+          dpkg-deb --build pkg gdrive-linux_0.2.0_all.deb
       - uses: actions/upload-artifact@v4
         with:
           name: gdrive-linux-deb
-          path: gdrive-linux_0.1.1_all.deb
+          path: gdrive-linux_0.2.0_all.deb
