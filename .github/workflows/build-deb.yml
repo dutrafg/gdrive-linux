@@ -13,14 +13,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate Python syntax
         run: |
-          python3 -m py_compile gdrive-linux rclone_backend.py settings.py progress.py google_oauth.py sync_plan.py safe_sync.py background_sync.py mount_drive.py mount_health.py photos_export.py desktop_files.py deletion_review.py diagnostics.py rclone_errors.py ui_kit.py
-          python3 -m unittest -v test_backend test_settings test_progress test_google_oauth test_sync_plan test_safe_sync test_background_sync test_mount_drive test_mount_health test_photos_export test_desktop_files test_deletion_review test_diagnostics test_rclone_errors
+          python3 -m py_compile gdrive-linux rclone_backend.py settings.py progress.py google_oauth.py sync_plan.py safe_sync.py background_sync.py mount_drive.py mount_health.py photos_export.py desktop_files.py deletion_review.py diagnostics.py rclone_errors.py mount_autostart.py sync_filters.py sync_profiles.py filemanager_bookmarks.py google_docs_export.py tray_indicator.py tray_autostart.py ui_kit.py
+          python3 -m unittest -v test_backend test_settings test_progress test_google_oauth test_sync_plan test_safe_sync test_background_sync test_mount_drive test_mount_health test_photos_export test_desktop_files test_deletion_review test_diagnostics test_rclone_errors test_sync_profiles test_desktop_integrations
       - name: Install GTK4 Wayland test dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-gi gir1.2-gtk-4.0 weston dbus-x11 rclone
       - name: Offline rclone transfer integration tests
-        run: /usr/bin/python3 -m unittest -v test_integration test_background_sync
+        run: /usr/bin/python3 -m unittest -v test_integration test_background_sync test_sync_profiles
       - name: GTK4 native Wayland startup smoke test
         run: |
           set -eu
@@ -80,12 +80,12 @@ jobs:
       - name: Validate Debian package metadata and contents
         run: |
           set -eu
-          dpkg-deb --info gdrive-linux_0.13.2_all.deb
-          dpkg-deb --contents gdrive-linux_0.13.2_all.deb
-          test "$(dpkg-deb -f gdrive-linux_0.13.2_all.deb Package)" = "gdrive-linux"
-          test "$(dpkg-deb -f gdrive-linux_0.13.2_all.deb Version)" = "0.13.2"
+          dpkg-deb --info gdrive-linux_0.14.0_all.deb
+          dpkg-deb --contents gdrive-linux_0.14.0_all.deb
+          test "$(dpkg-deb -f gdrive-linux_0.14.0_all.deb Package)" = "gdrive-linux"
+          test "$(dpkg-deb -f gdrive-linux_0.14.0_all.deb Version)" = "0.14.0"
           mkdir -p /tmp/gdrive-deb-check
-          dpkg-deb -x gdrive-linux_0.13.2_all.deb /tmp/gdrive-deb-check
+          dpkg-deb -x gdrive-linux_0.14.0_all.deb /tmp/gdrive-deb-check
           test -x /tmp/gdrive-deb-check/usr/bin/gdrive-linux
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/gdrive-linux
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/rclone_backend.py
@@ -102,6 +102,11 @@ jobs:
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/deletion_review.py
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/diagnostics.py
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/rclone_errors.py
+          for name in mount_autostart.py sync_filters.py sync_profiles.py filemanager_bookmarks.py google_docs_export.py tray_indicator.py tray_autostart.py; do
+            test -f "/tmp/gdrive-deb-check/usr/share/gdrive-linux/$name"
+          done
+          test -f /tmp/gdrive-deb-check/usr/share/applications/gdrive-linux-indicator.desktop
+          grep -q "^WantedBy=default.target$" /tmp/gdrive-deb-check/usr/lib/systemd/user/gdrive-linux-mount.service
           test -f /tmp/gdrive-deb-check/usr/lib/systemd/user/gdrive-linux-mount.service
           test -f /tmp/gdrive-deb-check/usr/lib/systemd/user/gdrive-linux-sync.timer
           test -f /tmp/gdrive-deb-check/usr/lib/systemd/user/gdrive-linux-sync.service
@@ -114,21 +119,24 @@ jobs:
       - name: Install Debian package and verify launcher
         run: |
           set -eu
-          sudo apt-get install -y ./gdrive-linux_0.13.2_all.deb
+          sudo apt-get install -y ./gdrive-linux_0.14.0_all.deb
           test "$(dpkg-query -W -f='${Status}' gdrive-linux)" = "install ok installed"
-          test "$(dpkg-query -W -f='${Version}' gdrive-linux)" = "0.13.2"
+          test "$(dpkg-query -W -f='${Version}' gdrive-linux)" = "0.14.0"
           test -x /usr/bin/gdrive-linux
-          dpkg-deb -f gdrive-linux_0.13.2_all.deb Depends | grep -q 'gir1.2-gtk-4.0'
-          ! dpkg-deb -f gdrive-linux_0.13.2_all.deb Depends | grep -q 'rclone'
-          dpkg-deb -f gdrive-linux_0.13.2_all.deb Recommends | grep -q 'rclone'
+          dpkg-deb -f gdrive-linux_0.14.0_all.deb Depends | grep -q 'gir1.2-gtk-4.0'
+          ! dpkg-deb -f gdrive-linux_0.14.0_all.deb Depends | grep -q 'rclone'
+          dpkg-deb -f gdrive-linux_0.14.0_all.deb Recommends | grep -q 'rclone'
           test -f /usr/share/gdrive-linux/gdrive-linux
           test -f /usr/share/gdrive-linux/style.css
           test -f /usr/share/gdrive-linux/ui_kit.py
           test -f /usr/lib/systemd/user/gdrive-linux-sync.timer
           test -f /usr/lib/systemd/user/gdrive-linux-mount.service
           test -f /usr/share/gdrive-linux/photos_export.py
+          test -f /usr/share/gdrive-linux/sync_profiles.py
+          test -f /usr/share/gdrive-linux/google_docs_export.py
+          test -f /usr/share/applications/gdrive-linux-indicator.desktop
           test -f /usr/share/applications/gdrive-linux.desktop
       - uses: actions/upload-artifact@v4
         with:
           name: gdrive-linux-deb
-          path: gdrive-linux_0.13.2_all.deb
+          path: gdrive-linux_0.14.0_all.deb
