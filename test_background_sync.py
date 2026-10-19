@@ -195,6 +195,26 @@ class RcloneMirrorIntegrationTests(unittest.TestCase):
         self.assertFalse((self.folder / "document.txt").exists())
         self.assertTrue(list(self.backups.rglob("document.txt")))
 
+    def test_one_way_upload_reports_skipped_downloads(self):
+        (self.folder / "local.txt").write_text("from laptop", encoding="utf-8")
+        (self.cloud / "remote.txt").write_text("only online", encoding="utf-8")
+        self.config["mode"] = "upload"
+        status = self.run_sync()
+        self.assertEqual(status["state"], "ok")
+        self.assertEqual(status["copied"], 1)
+        self.assertEqual(status["skipped_direction"], 1)
+        self.assertFalse((self.folder / "remote.txt").exists())
+
+    def test_one_way_download_reports_skipped_uploads(self):
+        (self.folder / "local.txt").write_text("stay local", encoding="utf-8")
+        (self.cloud / "remote.txt").write_text("from Drive", encoding="utf-8")
+        self.config["mode"] = "download"
+        status = self.run_sync()
+        self.assertEqual(status["state"], "ok")
+        self.assertEqual(status["copied"], 1)
+        self.assertEqual(status["skipped_direction"], 1)
+        self.assertFalse((self.cloud / "local.txt").exists())
+
     def test_large_queue_drains_by_batches(self):
         for i in range(7):
             (self.cloud / ("file" + str(i) + ".txt")).write_text("data", encoding="utf-8")
@@ -202,10 +222,17 @@ class RcloneMirrorIntegrationTests(unittest.TestCase):
                          backup_base=self.backups, max_files=3)
         self.assertEqual(first["copied"], 3)
         self.assertEqual(first["pending"], 4)
+        self.assertEqual(first["state"], "partial")
         second = run_once(config=self.config, state_base=self.state,
                           backup_base=self.backups, max_files=3)
         self.assertEqual(second["copied"], 3)
         self.assertEqual(second["pending"], 1)
+        self.assertEqual(second["state"], "partial")
+        final = run_once(config=self.config, state_base=self.state,
+                         backup_base=self.backups, max_files=3)
+        self.assertEqual(final["copied"], 1)
+        self.assertEqual(final["pending"], 0)
+        self.assertEqual(final["state"], "ok")
 
     def test_deleted_cloud_file_is_not_removed_locally(self):
         (self.folder / "keep.txt").write_text("safe", encoding="utf-8")
