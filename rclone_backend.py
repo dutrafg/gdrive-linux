@@ -49,3 +49,21 @@ def copy_command(remote, local_folder, direction, preserve_newer=False, skip_exi
             raise ValueError('Proteção automática disponível somente para download')
         command.append('--update')
     return command
+
+def search_files(remote, term, timeout=120, limit=100):
+    """Search a selected remote by path (read-only; no copies or deletes)."""
+    remote_path(remote)
+    if not isinstance(term, str) or not (2 <= len(term.strip()) <= 120):
+        raise ValueError("Digite pelo menos 2 caracteres para pesquisar.")
+    result = subprocess.run(
+        ['rclone', 'lsjson', remote_path(remote), '--recursive', '--files-only',
+         '--no-mimetype'], capture_output=True, text=True, check=True, timeout=timeout)
+    entries = json.loads(result.stdout)
+    if not isinstance(entries, list):
+        raise ValueError("Resposta de pesquisa inválida")
+    needle = term.strip().casefold()
+    return [{'name': item['Path'], 'directory': False,
+             'size': item.get('Size', 0)}
+            for item in entries
+            if isinstance(item, dict) and isinstance(item.get('Path'), str)
+            and needle in item['Path'].casefold()][:limit]
