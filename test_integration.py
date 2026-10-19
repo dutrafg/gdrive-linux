@@ -73,6 +73,38 @@ class LocalTransferTests(unittest.TestCase):
 
 
 
+    def test_manual_upload_default_preserves_existing_remote_data(self):
+        with tempfile.TemporaryDirectory() as root:
+            base = Path(root)
+            source, destination = base / "local", base / "cloud"
+            source.mkdir()
+            destination.mkdir()
+            (source / "shared.txt").write_text("edited locally")
+            (source / "new.txt").write_text("new upload")
+            (destination / "shared.txt").write_text("existing cloud version")
+            command = copy_command("drive", source, "upload", skip_existing=True)
+            command[3] = str(destination)
+            process = subprocess.run(command, capture_output=True, text=True, timeout=45)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            self.assertEqual((destination / "shared.txt").read_text(), "existing cloud version")
+            self.assertEqual((destination / "new.txt").read_text(), "new upload")
+
+    def test_manual_download_default_preserves_existing_local_data(self):
+        with tempfile.TemporaryDirectory() as root:
+            base = Path(root)
+            cloud, local = base / "cloud", base / "local"
+            cloud.mkdir()
+            local.mkdir()
+            (cloud / "shared.txt").write_text("remote edit")
+            (cloud / "new.txt").write_text("new download")
+            (local / "shared.txt").write_text("local unsynced version")
+            command = copy_command("drive", local, "download", skip_existing=True)
+            command[2] = str(cloud)
+            process = subprocess.run(command, capture_output=True, text=True, timeout=45)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            self.assertEqual((local / "shared.txt").read_text(), "local unsynced version")
+            self.assertEqual((local / "new.txt").read_text(), "new download")
+
     def test_automatic_download_preserves_existing_file(self):
         with tempfile.TemporaryDirectory() as root:
             base = Path(root)
