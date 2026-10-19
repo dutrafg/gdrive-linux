@@ -71,14 +71,15 @@ def main():
         parser.error("Use --serve ou --check")
     try:
         settings = load_settings()
-        cmd = command(settings, require_tools=True, create=args.serve)
-        # Local config inspection; no Google API request or token output.
+        # Check the local remote before creating even an empty mount directory.
+        # This never touches the Google API and does not print OAuth credentials.
         if args.serve:
             from rclone_backend import list_remotes
             if settings.get("account") not in list_remotes():
                 raise ValueError(
                     "Conta ausente no rclone deste serviço. Confira o remoto selecionado "
                     "e a localização do rclone.conf; nenhum arquivo foi modificado.")
+        cmd = command(settings, require_tools=True, create=args.serve)
     except (ValueError, RuntimeError, OSError) as exc:
         parser.exit(1, "Drive para Linux: " + str(exc) + "\n")
     if args.check:
