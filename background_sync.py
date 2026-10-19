@@ -18,6 +18,7 @@ from pathlib import Path
 from rclone_backend import list_remotes, remote_path
 from settings import load_settings
 from sync_plan import local_inventory, remote_inventory, validate_relative
+from sync_filters import filtered_inventory, parse_rules
 from rclone_errors import (rclone_limits, is_rate_limit, friendly,
                            cooldown_active, quota_retry_after)
 
@@ -100,12 +101,13 @@ def read_json(path):
     except (OSError, ValueError):
         return {}
 
-def inventories(remote, folder):
+def inventories(remote, folder, includes=(), excludes=()):
     local = {key: val for key, val in local_inventory(folder).items()
              if not is_private_path(key)}
     cloud = {key: val for key, val in remote_inventory(remote).items()
              if not is_private_path(key)}
-    return local, cloud
+    return (filtered_inventory(local, includes, excludes),
+            filtered_inventory(cloud, includes, excludes))
 
 def transfer_one(remote, folder, operation, relative, run_id, backup_base=BACKUP_BASE):
     """One rclone copy. For modified files the old destination is backed up."""
@@ -195,6 +197,8 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
     config = load_settings() if config is None else config
     if not config.get("auto_sync_enabled", False):
         return {"state": "disabled", "copied": 0, "conflicts": 0}
+    includes = parse_rules(config.get("sync_includes", []))
+    excludes = parse_rules(config.get("sync_excludes", []))
     remote = config.get("account")
     folder_value = config.get("folder")
     if not isinstance(remote, str) or not remote or not isinstance(folder_value, str):
@@ -225,7 +229,7 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
         baseline = read_json(snapshot_path).get("md5", {})
         if not isinstance(baseline, dict):
             raise ValueError("Estado da sincronização inválido")
-        local, cloud = inventories(remote, folder)
+        local, cloud = inventories(remote, folder, includes, excludes)
         actions, conflicts = build_plan(local, cloud, baseline)
         if dry_run:
             return {"state": "preview", "copied": 0,
@@ -251,7 +255,7 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
                 copied += 1
         finally:
             # Keep track of copies actually verified even if a later copy fails.
-            local_after, cloud_after = inventories(remote, folder)
+            local_after, cloud_after = inventories(remote, folder, includes, excludes)
             new_base = refresh_baseline(baseline, local_after, cloud_after)
             save_private_json(snapshot_path, {"md5": new_base})
         status = {"state": "ok" if not conflicts else "conflicts",
