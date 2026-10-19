@@ -11,7 +11,7 @@ from rclone_backend import list_remotes, copy_command, list_files
 from settings import load_settings, save_settings
 from progress import parse_progress
 
-VERSION = "0.9.0"
+VERSION = "0.9.1"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -21,6 +21,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.busy = False
         self.preferences = load_settings()
         self.restoring_accounts = False
+        self.refresh_generation = 0
         self.cancel_requested = False
         self.progress_known = False
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -154,7 +155,10 @@ class DriveWindow(Gtk.ApplicationWindow):
 
     def persist(self):
         try:
-            save_settings(self.folder, self.selected_remote() or "")
+            account = self.selected_remote() or ""
+            save_settings(self.folder, account)
+            self.preferences["account"] = account
+            self.preferences["folder"] = str(self.folder)
         except OSError as exc:
             self.status.set_text("Não foi possível salvar preferências: " + str(exc))
 
@@ -251,21 +255,41 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.status.set_text("Abra um terminal e execute: rclone config")
 
     def refresh(self, *_):
+        """Fetch rclone remotes off the GTK main thread."""
+        self.refresh_generation += 1
+        generation = self.refresh_generation
+        self.status.set_text("Consultando contas…")
+        threading.Thread(target=self.refresh_worker, args=(generation,), daemon=True).start()
+
+    def refresh_worker(self, generation):
         try:
             names = list_remotes()
-            current = self.selected_remote() or self.preferences.get("account", "")
-            self.restoring_accounts = True
-            self.remotes.splice(0, self.remotes.get_n_items(), names)
-            self.path_parts = []
-            self.browse_generation += 1
-            if names:
-                self.dropdown.set_selected(names.index(current) if current in names else 0)
-            self.restoring_accounts = False
-            self.account_changed()
-            if not names:
-                self.status.set_text("Nenhuma conta configurada. Clique em Configurar.")
         except (OSError, subprocess.SubprocessError) as exc:
-            self.status.set_text("Não foi possível consultar o rclone: " + str(exc))
+            GLib.idle_add(self.refresh_error, generation, str(exc))
+            return
+        GLib.idle_add(self.refresh_complete, generation, names)
+
+    def refresh_error(self, generation, message):
+        if generation == self.refresh_generation:
+            self.status.set_text("Não foi possível consultar o rclone: " + message)
+        return False
+
+    def refresh_complete(self, generation, names):
+        if generation != self.refresh_generation:
+            return False
+        current = self.selected_remote() or self.preferences.get("account", "")
+        self.restoring_accounts = True
+        try:
+            self.remotes.splice(0, self.remotes.get_n_items(), names)
+            self.dropdown.set_selected(names.index(current) if current in names else (0 if names else Gtk.INVALID_LIST_POSITION))
+        finally:
+            self.restoring_accounts = False
+        self.account_changed()
+        self.status.set_text(
+            str(len(names)) + " conta(s) disponível(is)." if names
+            else "Nenhuma conta configurada. Clique em Configurar."
+        )
+        return False
 
     def append(self, line):
         buf = self.log.get_buffer()
