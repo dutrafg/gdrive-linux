@@ -818,7 +818,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         dialog.set_child(content)
         content.append(section_title("Recuperar cópia arquivada?",
             "Arquivo: " + item.relative + "\nSerá criada uma nova cópia em " +
-            str(recovery_root()) + ". O backup original e o Google Drive "
+            str(recovery_root(mirror_folder=self.folder)) + ". O backup original e o Google Drive "
             "não serão modificados."))
         content.append(action("Cancelar", lambda *_: dialog.close()))
         def confirm(_button):
@@ -832,7 +832,7 @@ class DriveWindow(Gtk.ApplicationWindow):
 
     def recovery_restore_worker(self, item):
         try:
-            dest = restore_local_backup(item)
+            dest = restore_local_backup(item, mirror_folder=self.folder)
             result = (True, "Cópia restaurada em: " + str(dest))
         except (OSError, ValueError) as exc:
             result = (False, "Não foi possível restaurar: " + str(exc))
