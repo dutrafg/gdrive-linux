@@ -1,6 +1,6 @@
 # Drive para Linux
 
-Cliente desktop experimental **GTK4 + rclone** para Google Drive em Linux. **Versão 0.12.0 Alpha**. Projeto independente, não oficial do Google.
+Cliente desktop experimental **GTK4 + rclone** para Google Drive em Linux. **Versão 0.13.0 Alpha**. Projeto independente, não oficial do Google.
 
 ## Interface
 
@@ -18,10 +18,10 @@ A consulta de nomes/pastas não aparece como transferência em andamento. Os bot
 
 ## Instalação no Zorin OS, Ubuntu e Debian
 
-Baixe o artefato aprovado na página de [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions), extraia o ZIP e instale o `gdrive-linux_0.12.0_all.deb`:
+Baixe o artefato aprovado na página de [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions), extraia o ZIP e instale o `gdrive-linux_0.13.0_all.deb`:
 
 ```bash
-sudo apt install ./gdrive-linux_0.12.0_all.deb
+sudo apt install ./gdrive-linux_0.13.0_all.deb
 ```
 
 O pacote requer Python 3, PyGObject e GTK4. A dependência `rclone` é **recomendada**, para permitir que a interface seja instalada mesmo quando o Zorin não oferece esse pacote nas fontes configuradas. **Sem o rclone, conexão e transferência não funcionam.** Confirme com `rclone version`; instruções oficiais: https://rclone.org/install/ .
@@ -55,7 +55,7 @@ O smoke GTK4 não equivale a avaliação visual humana nem a autenticação Goog
 
 ## Versionamento
 
-Até a v0.12.0, o aplicativo permanece **Alpha**. A promoção para uma versão pré-estável ou Beta depende de QA, especialmente autenticação com conta Google, compatibilidade em Zorin OS e confiabilidade de cópias.
+Até a v0.13.0, o aplicativo permanece **Alpha**. A promoção para uma versão pré-estável ou Beta depende de QA, especialmente autenticação com conta Google, compatibilidade em Zorin OS e confiabilidade de cópias.
 
 ## Identificação da conta no Zorin OS
 
@@ -80,3 +80,29 @@ O timer não precisa da janela GTK aberta; não é necessário entrar no aplicat
 Confira [PARIDADE_WINDOWS.md](PARIDADE_WINDOWS.md) para a matriz de recursos presentes, parciais e ainda não implementados. O aplicativo oferece uma experiência Linux GTK4 própria; não copia marca, recursos proprietários nem código do Google.
 
 Novos problemas da sincronização contínua, como erros e conflitos, podem gerar notificações do desktop quando `notify-send` estiver disponível. Arquivos criados na pasta local com a interface fechada são transferidos no próximo ciclo do serviço, desde que ele tenha sido ativado, o usuário esteja conectado e o rclone tenha acesso à rede.
+
+## Disco virtual FUSE (streaming sob demanda)
+
+Na seção **Disco virtual**, selecione a conta Google Drive em **Contas** e clique em **Montar Drive**. O programa inicia `gdrive-linux-mount.service` usando `rclone mount` e expõe o Drive na pasta **`~/DriveOnline/<nome-da-conta>`**, visível nos gerenciadores de arquivos como o Arquivos/Nautilus e o Files do Zorin.
+
+Requisitos: `rclone`, `fuse3`, `/dev/fuse` e `systemctl --user`. O pacote recomenda `fuse3`, mas pode ser necessário instalá-lo separadamente: `sudo apt install fuse3`.
+
+A montagem é **somente leitura por padrão**. Há uma opção explícita de gravação experimental, com cache VFS do rclone (limite configurado de 2 GB) e possibilidade de conflitos; não a habilite para arquivos importantes antes de testar. A montagem é **separada** da pasta local espelhada, para evitar loops entre streaming e sincronização. Use **Desmontar Drive** antes de desconectar a rede ou trocar de conta. O serviço pode continuar ativo com a janela fechada durante a sessão Linux, mas não é montado automaticamente sem você solicitar.
+
+## Abrir arquivos de Office e outros documentos
+
+Em **Arquivos**, selecione um documento disponível na pasta espelhada ou no disco virtual e clique em **Abrir documento selecionado no aplicativo padrão**. Se o arquivo estiver espelhado localmente, LibreOffice, OnlyOffice e outros aplicativos associados ao tipo podem abri-lo e salvar alterações; a sincronização contínua propagará edições locais no próximo ciclo caso não haja conflito.
+
+**Limitação:** o rclone não fornece a presença colaborativa em tempo real do Microsoft Office para Windows nem integração proprietária com Outlook. A montagem FUSE em modo somente leitura serve para consulta; para editar e salvar use preferencialmente o espelho local.
+
+## Enviar fotos e vídeos para o Google Fotos
+
+O Google Fotos é um *backend independente* do Google Drive no rclone. Configure um remoto `google photos` com seu Client ID/Secret pelo `rclone config` (interface avançada). Depois, em **Google Fotos**, selecione esse remoto, informe o álbum e use **Verificar fotos e vídeos** para conferir a quantidade antes do botão **Enviar mídia ao Google Fotos**.
+
+O envio é **manual e não destrutivo**. Ele usa `rclone copy --ignore-existing`, restringe os formatos a imagens e vídeos reconhecidos e não realiza exclusões. A API pode aplicar limitações de confirmação, tamanho e álbum. Desde 31 de março de 2025, o backend do rclone não pode baixar toda a biblioteca histórica: somente conteúdo criado pela própria integração. Portanto, esta funcionalidade **não equivale a backup/restauração integral do Google Photos**. Consulte https://rclone.org/googlephotos/ .
+
+## Revisão de exclusões e renomeações
+
+Arquivos que desapareceram somente de um lado continuam classificados como conflito por segurança. Na página **Sincronização → Revisar exclusões com arquivamento recuperável**, escolha um único arquivo e confirme. A cópia remanescente será **movida para um arquivo de recuperação**: cópia local em `~/.local/share/gdrive-linux/backups` ou cópia remota em `.gdrive-linux-history/archived-deletions`, conforme o lado que sofreu a exclusão.
+
+Não existe exclusão automática destrutiva. Renomeações são atualmente tratadas como exclusão + novo arquivo e podem exigir revisão manual. Após arquivar, os dados permanecem recuperáveis. Não modifique a estrutura dos históricos internos e mantenha backup externo separado.
