@@ -11,7 +11,7 @@ from rclone_backend import list_remotes, copy_command, list_files
 from settings import load_settings, save_settings
 from progress import parse_progress
 
-VERSION = "0.9.6"
+VERSION = "0.9.7"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -65,6 +65,9 @@ class DriveWindow(Gtk.ApplicationWindow):
         config = Gtk.Button(label="Configurar")
         config.connect("clicked", self.configure)
         row.append(config)
+        connect_google = Gtk.Button(label="Conectar Google")
+        connect_google.connect("clicked", self.connect_google)
+        accounts_page.append(connect_google)
 
         folderrow = Gtk.Box(spacing=8)
         accounts_page.append(folderrow)
@@ -289,6 +292,14 @@ class DriveWindow(Gtk.ApplicationWindow):
         if not self.busy and self.selected_remote() and self.folder.is_dir():
             self.transfer(None, "download", automatic=True)
         return True
+
+    def connect_google(self, *_):
+        """Open rclone's own OAuth configuration in a terminal."""
+        self.status.set_text("Abrindo configuração Google pelo rclone. A autorização ocorre no navegador.")
+        try:
+            subprocess.Popen(["x-terminal-emulator", "-e", "rclone", "config"])
+        except OSError as exc:
+            self.status.set_text("Não foi possível abrir o assistente do rclone: " + str(exc))
 
     def configure(self, *_):
         try:
