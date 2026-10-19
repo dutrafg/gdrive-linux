@@ -1,6 +1,6 @@
 # Política de segurança — Drive para Linux
 
-**Estado:** 0.11.1 Alpha, software experimental. Não há auditoria de segurança independente nem garantia de uso em produção.
+**Estado:** 0.11.2 Alpha, software experimental. Não há auditoria de segurança independente nem garantia de uso em produção.
 
 ## Reportar vulnerabilidades
 
@@ -26,7 +26,7 @@ Informe versão, distribuição Linux, passos de reprodução, impacto e registr
 
 ## Armazenamento local
 
-- Preferências locais são armazenadas em `~/.config/gdrive-linux/settings.json` sem tokens OAuth, com permissões restritas quando gravadas pelo aplicativo.
+- Identificações amigáveis de conta são informações fornecidas pelo usuário e mantidas localmente; não representam endereços Google validados automaticamente. A verificação pelo rclone confirma apenas que o acesso remoto funciona.\n- Preferências locais são armazenadas em `~/.config/gdrive-linux/settings.json` sem tokens OAuth, com permissões restritas quando gravadas pelo aplicativo.
 - Credenciais ficam sob responsabilidade da configuração do rclone. O aplicativo não implementa integração própria com Secret Service.
 - O histórico de transferências é somente da sessão; os logs exibidos na interface podem revelar **nomes de arquivos** e caminhos. Evite compartilhar logs sem revisão.
 
