@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from background_sync import (
     build_plan, refresh_baseline, run_once, save_private_json, read_json,
+    notify_if_changed,
 )
 
 MD5_A = ("md5", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -67,6 +68,16 @@ class SafePlanTests(unittest.TestCase):
             save_private_json(path, {"md5": {"doc.txt": MD5_A[1]}})
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
             self.assertEqual(read_json(path)["md5"]["doc.txt"], MD5_A[1])
+
+    @patch("background_sync.subprocess.run")
+    @patch("background_sync.shutil.which", return_value="/usr/bin/notify-send")
+    def test_notification_only_on_new_conflict(self, which, run):
+        self.assertTrue(notify_if_changed(
+            {"state": "ok"}, {"state": "conflicts", "conflicts": 2}))
+        run.assert_called_once()
+        self.assertFalse(notify_if_changed(
+            {"state": "conflicts", "conflicts": 2},
+            {"state": "conflicts", "conflicts": 2}))
 
     def test_disabled_job_does_no_io(self):
         with patch("background_sync.list_remotes") as remotes:
