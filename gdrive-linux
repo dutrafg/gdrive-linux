@@ -330,6 +330,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         automatic.append(self.background_status)
         automatic.append(action("Ver status do serviço", self.update_background_status,
                                 "view-refresh-symbolic"))
+        automatic.append(action("Sincronizar agora", self.run_background_now,
+                                "media-playback-start-symbolic", primary=True))
         manual = card("Sincronização seletiva",
             "Simule primeiro; transfira apenas arquivos exclusivos, preservando conflitos.",
             "emblem-synchronizing-symbolic")
@@ -817,6 +819,30 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.auto_info.set_text(message)
         self.notice(message, "success" if success else "warning")
         self.update_background_status()
+        return False
+
+    def run_background_now(self, *_):
+        if not self.auto_enabled:
+            self.notice("Ative a sincronização contínua para sincronizar agora.", "warning")
+            return
+        self.auto_info.set_text("Sincronização iniciada pelo serviço do Linux…")
+        threading.Thread(target=self.run_background_now_worker, daemon=True).start()
+
+    def run_background_now_worker(self):
+        try:
+            response = subprocess.run(
+                ["systemctl", "--user", "start", "gdrive-linux-sync.service"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1100)
+            success = response.returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            success = False
+        GLib.idle_add(self.finish_background_now, success)
+
+    def finish_background_now(self, success):
+        self.update_background_status()
+        self.notice("Verificação de sincronização concluída."
+                    if success else "O serviço não concluiu a sincronização. Verifique o status.",
+                    "success" if success else "warning")
         return False
 
     def update_background_status(self, *_):
