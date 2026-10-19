@@ -1,5 +1,6 @@
 """Unit tests for mount safety; no FUSE device or account needed."""
 import tempfile
+import os
 import unittest
 import io
 import sys
@@ -92,11 +93,15 @@ class MountTests(unittest.TestCase):
             root = Path(tmp) / "DriveOnline"
             root.mkdir()
             original_exists = Path.exists
+            original_access = os.access
             with (patch("mount_drive.shutil.which", return_value="/usr/bin/rclone"),
                   patch("mount_drive.Path.exists", autospec=True,
                         side_effect=lambda path: (str(path) == "/dev/fuse" or
                                                  original_exists(path))),
-                  patch("mount_drive.os.access", return_value=False)):
+                  patch("mount_drive.os.access",
+                        side_effect=lambda path, mode: (
+                            False if str(path) == "/dev/fuse"
+                            else original_access(path, mode)))):
                 with self.assertRaisesRegex(RuntimeError, "não consegue acessar"):
                     validate_mount({"account": "personal",
                                     "folder": str(Path(tmp) / "mirror")},
