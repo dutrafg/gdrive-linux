@@ -1,4 +1,4 @@
-# QA — Drive para Linux v0.11.1 Alpha
+# QA — Drive para Linux v0.13.0 Alpha
 
 Este documento reúne critérios de homologação. **Testes automatizados não substituem teste gráfico real no Zorin OS.**
 
@@ -41,3 +41,21 @@ Marque apenas após a execução correspondente estar **verde** em https://githu
 - Sucesso dos testes automatizados da **revisão final**, não apenas de builds anteriores.
 
 Versão **Alpha** até que todos os critérios aplicáveis sejam verificados.
+
+## QA adicional — novos recursos v0.13.0
+
+- [ ] CI: testes dos módulos `mount_drive.py`, `photos_export.py`, `desktop_files.py`, `deletion_review.py` e `diagnostics.py`.
+- [ ] CI: integração rclone local entre duas pastas, incluindo edições, backup, conflito e execução com a janela fechada.
+- [ ] CI: CSS/GTK4 em Wayland, testes de navegação pelas telas de Disco virtual e Google Fotos, empacotamento e instalação do `.deb`.
+- [ ] Zorin real: executar **Configurações → Diagnóstico de compatibilidade** com a conta selecionada, conferindo requisitos do timer e do FUSE.
+- [ ] Zorin real: instalar `fuse3`, usar **Disco virtual → Montar Drive**, verificar a pasta `~/DriveOnline/<remote>`, abrir e desmontar sem erro.
+- [ ] Zorin real: provar que o disco virtual não se confunde com a pasta local espelhada e que o modo padrão não permite escrita.
+- [ ] Zorin real: escolher um `.docx` espelhado, abrir no editor padrão Linux, salvar e observar sincronização após um ciclo.
+- [ ] Zorin real: configurar remoto `google photos` com OAuth próprio e testar preview/envio de uma mídia descartável. Não tentar restaurar biblioteca histórica via API.
+- [ ] Zorin real: excluir um arquivo apenas de um lado, usar **Revisar exclusões**, confirmar o destino de arquivo recuperável.
+- [ ] Verificar que não há transferências de fotos, montagens nem arquivamentos iniciados sem intervenção do usuário.
+- [ ] Conferir pausa do serviço de sincronização, conta selecionada, autenticação, reabertura da GUI e comportamento após desconexão.
+
+### Limites dos resultados
+
+O GitHub Actions testa os comandos FUSE e do Google Photos sem credenciais reais. Não dispõe de uma sessão Zorin instalada nem de acesso à sua conta Google. Uma compilação verde confirma os testes listados, **não** equivale a homologação dessas APIs ou do kernel FUSE no computador final.
