@@ -18,6 +18,7 @@ from pathlib import Path
 
 from rclone_backend import list_remotes, remote_path
 from settings import load_settings
+from rclone_config import activate_worker_config
 from sync_plan import local_inventory, remote_inventory, validate_relative
 from sync_filters import filtered_inventory, parse_rules
 from sync_profiles import effective_profiles, get_profile_mode, ensure_external_volume_present
@@ -249,6 +250,7 @@ def refresh_baseline(previous, local, cloud):
 def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
              max_files=MAX_FILES, dry_run=False):
     config = load_settings() if config is None else config
+    activate_worker_config(config)
     if not config.get("auto_sync_enabled", False):
         return {"state": "disabled", "copied": 0, "conflicts": 0}
     mode = get_profile_mode(config)
@@ -374,6 +376,7 @@ def run_profiles(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
                  max_files=MAX_FILES, dry_run=False):
     """Run multiple account+folder pairs independently, preserving errors."""
     config = load_settings() if config is None else config
+    activate_worker_config(config)
     jobs = effective_profiles(config)
     if not jobs:
         return {"state": "disabled", "copied": 0, "pending": 0,
