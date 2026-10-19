@@ -31,6 +31,9 @@ def load_settings():
         result["sync_mode"] = validate_mode(data.get("sync_mode", "bidirectional"))
         result["sync_profiles"] = validate_profiles(data.get("sync_profiles", []))
         result["profiles_configured"] = data.get("profiles_configured") is True
+        from rclone_config import normalize_config_path
+        configured = data.get("rclone_config_file", "")
+        result["rclone_config_file"] = normalize_config_path(configured) if configured else ""
         return result
     except (OSError, ValueError, TypeError):
         return {}
@@ -39,7 +42,7 @@ def save_settings(folder, account="", account_names=None, auto_sync_enabled=Fals
                   mount_read_only=True, auto_archive_deletions=False,
                   sync_includes=None, sync_excludes=None,
                   sync_mode="bidirectional", sync_profiles=None,
-                  profiles_configured=False):
+                  profiles_configured=False, rclone_config_file=""):
     CONFIG_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(CONFIG_DIR, 0o700)
     from sync_filters import parse_rules
@@ -48,13 +51,16 @@ def save_settings(folder, account="", account_names=None, auto_sync_enabled=Fals
     from sync_profiles import validate_profiles, validate_mode
     profiles = validate_profiles(sync_profiles)
     mode = validate_mode(sync_mode)
+    from rclone_config import normalize_config_path
+    selected_config = normalize_config_path(rclone_config_file)
     payload_data = {"folder": str(folder), "account": account,
                     "auto_sync_enabled": auto_sync_enabled is True,
                     "mount_read_only": mount_read_only is not False,
                     "auto_archive_deletions": auto_archive_deletions is True,
                     "sync_includes": includes, "sync_excludes": excludes,
                     "sync_mode": mode, "sync_profiles": profiles,
-                    "profiles_configured": profiles_configured is True}
+                    "profiles_configured": profiles_configured is True,
+                    "rclone_config_file": selected_config}
     if account_names:
         payload_data["account_names"] = {
             k: v for k, v in account_names.items()
