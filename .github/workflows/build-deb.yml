@@ -82,12 +82,12 @@ jobs:
       - name: Validate Debian package metadata and contents
         run: |
           set -eu
-          dpkg-deb --info gdrive-linux_0.14.1_all.deb
-          dpkg-deb --contents gdrive-linux_0.14.1_all.deb
-          test "$(dpkg-deb -f gdrive-linux_0.14.1_all.deb Package)" = "gdrive-linux"
-          test "$(dpkg-deb -f gdrive-linux_0.14.1_all.deb Version)" = "0.14.1"
+          dpkg-deb --info gdrive-linux_0.14.2_all.deb
+          dpkg-deb --contents gdrive-linux_0.14.2_all.deb
+          test "$(dpkg-deb -f gdrive-linux_0.14.2_all.deb Package)" = "gdrive-linux"
+          test "$(dpkg-deb -f gdrive-linux_0.14.2_all.deb Version)" = "0.14.2"
           mkdir -p /tmp/gdrive-deb-check
-          dpkg-deb -x gdrive-linux_0.14.1_all.deb /tmp/gdrive-deb-check
+          dpkg-deb -x gdrive-linux_0.14.2_all.deb /tmp/gdrive-deb-check
           test -x /tmp/gdrive-deb-check/usr/bin/gdrive-linux
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/gdrive-linux
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/rclone_backend.py
@@ -101,6 +101,8 @@ jobs:
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/mount_checks.py
           grep -q 'Environment=PATH=' /tmp/gdrive-deb-check/usr/lib/systemd/user/gdrive-linux-mount.service
           grep -q 'TimeoutStartSec=180' /tmp/gdrive-deb-check/usr/lib/systemd/user/gdrive-linux-mount.service
+          grep -q 'TimeoutStopSec=180' /tmp/gdrive-deb-check/usr/lib/systemd/user/gdrive-linux-mount.service
+          grep -q 'RestartSec=900s' /tmp/gdrive-deb-check/usr/lib/systemd/user/gdrive-linux-mount.service
           grep -q "^Type=notify$" /tmp/gdrive-deb-check/usr/lib/systemd/user/gdrive-linux-mount.service
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/photos_export.py
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/desktop_files.py
@@ -124,13 +126,13 @@ jobs:
       - name: Install Debian package and verify launcher
         run: |
           set -eu
-          sudo apt-get install -y ./gdrive-linux_0.14.1_all.deb
+          sudo apt-get install -y ./gdrive-linux_0.14.2_all.deb
           test "$(dpkg-query -W -f='${Status}' gdrive-linux)" = "install ok installed"
-          test "$(dpkg-query -W -f='${Version}' gdrive-linux)" = "0.14.1"
+          test "$(dpkg-query -W -f='${Version}' gdrive-linux)" = "0.14.2"
           test -x /usr/bin/gdrive-linux
-          dpkg-deb -f gdrive-linux_0.14.1_all.deb Depends | grep -q 'gir1.2-gtk-4.0'
-          dpkg-deb -f gdrive-linux_0.14.1_all.deb Depends | grep -q 'rclone'
-          dpkg-deb -f gdrive-linux_0.14.1_all.deb Depends | grep -q 'fuse3'
+          dpkg-deb -f gdrive-linux_0.14.2_all.deb Depends | grep -q 'gir1.2-gtk-4.0'
+          dpkg-deb -f gdrive-linux_0.14.2_all.deb Depends | grep -q 'rclone'
+          dpkg-deb -f gdrive-linux_0.14.2_all.deb Depends | grep -q 'fuse3'
           test -f /usr/share/gdrive-linux/gdrive-linux
           test -f /usr/share/gdrive-linux/style.css
           test -f /usr/share/gdrive-linux/ui_kit.py
@@ -150,4 +152,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: gdrive-linux-deb
-          path: gdrive-linux_0.14.1_all.deb
+          path: gdrive-linux_0.14.2_all.deb
