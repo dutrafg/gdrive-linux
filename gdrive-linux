@@ -669,6 +669,9 @@ class DriveWindow(Gtk.ApplicationWindow):
         dialog.show()
 
     def safe_sync(self, *_):
+        if self.auto_enabled:
+            self.notice("Pause a sincronização contínua antes de uma cópia manual.", "warning")
+            return
         if self.busy or self.sync_busy:
             self.status.set_text("Aguarde a operação atual.")
             return
@@ -1041,6 +1044,9 @@ class DriveWindow(Gtk.ApplicationWindow):
 
     def confirm_transfer(self, direction):
         """Manual copies can overwrite files, so ask before starting."""
+        if self.auto_enabled:
+            self.notice("Pause a sincronização contínua antes de uma cópia manual.", "warning")
+            return
         if self.busy or self.sync_busy:
             self.notice("Aguarde a transferência atual.", "warning")
             return
