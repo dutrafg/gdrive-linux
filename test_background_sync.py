@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from background_sync import (
     build_plan, refresh_baseline, run_once, save_private_json, read_json,
-    notify_if_changed,
+    notify_if_changed, transfer_one,
 )
 
 MD5_A = ("md5", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -140,6 +140,38 @@ class SafePlanTests(unittest.TestCase):
                     state_base=Path(root) / "state",
                     backup_base=Path(root) / "backups")
             transfer.assert_called_once()
+
+    @patch("background_sync.subprocess.run")
+    def test_upload_does_not_send_file_edited_after_inventory(self, runner):
+        with tempfile.TemporaryDirectory() as root:
+            folder = Path(root)
+            (folder / "report.docx").write_bytes(b"New LibreOffice edit")
+            with self.assertRaisesRegex(RuntimeError, "mudou durante"):
+                transfer_one("demo", folder, "upload_update", "report.docx",
+                             "revision", backup_base=folder / "archive",
+                             expected_local_md5=MD5_A[1])
+            runner.assert_not_called()
+
+    @patch("background_sync.subprocess.run")
+    def test_download_does_not_overwrite_changed_local_destination(self, runner):
+        with tempfile.TemporaryDirectory() as root:
+            folder = Path(root)
+            (folder / "report.docx").write_bytes(b"Local changes still pending")
+            with self.assertRaisesRegex(RuntimeError, "mudou durante"):
+                transfer_one("demo", folder, "download_update", "report.docx",
+                             "revision", backup_base=folder / "archive",
+                             expected_local_md5=MD5_A[1])
+            runner.assert_not_called()
+
+    @patch("background_sync.subprocess.run")
+    def test_new_download_checks_destination_before_copy(self, runner):
+        with tempfile.TemporaryDirectory() as root:
+            folder = Path(root)
+            (folder / "new.txt").write_text("user created during scan")
+            with self.assertRaisesRegex(ValueError, "Destino local já existe"):
+                transfer_one("demo", folder, "download_new", "new.txt",
+                             "revision", backup_base=folder / "archive")
+            runner.assert_not_called()
 
     def test_disabled_job_does_no_io(self):
         with patch("background_sync.list_remotes") as remotes:
