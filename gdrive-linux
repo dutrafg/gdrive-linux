@@ -1274,6 +1274,10 @@ def ui_smoke():
         raise AssertionError("Account connection status missing")
     if not hasattr(window, "auto_info"):
         raise AssertionError("Automatic-download state label missing")
+    if not hasattr(window, "background_status"):
+        raise AssertionError("Continuous background service status missing")
+    if not hasattr(window, "search_entry"):
+        raise AssertionError("Drive search control missing")
     window.close()
     print("GTK4 UI OK: navigation, cards, labels and defaults")
     return 0
