@@ -1,6 +1,6 @@
 # Drive para Linux
 
-Cliente desktop experimental **GTK4 + rclone** para Google Drive em Linux. **Versão 0.14.0 Alpha**. Projeto independente, não oficial do Google.
+Cliente desktop experimental **GTK4 + rclone** para Google Drive em Linux. **Versão 0.14.1 Alpha**. Projeto independente, não oficial do Google.
 
 ## Interface
 
@@ -18,7 +18,7 @@ A consulta de nomes/pastas não aparece como transferência em andamento. Os bot
 
 ## Instalação no Zorin OS, Ubuntu e Debian
 
-Baixe o artefato aprovado na página de [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions), extraia o ZIP e instale o `gdrive-linux_0.14.0_all.deb`:
+Baixe o artefato aprovado na página de [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions), extraia o ZIP e instale o `gdrive-linux_0.14.1_all.deb`:
 
 ```bash
 sudo apt install ./gdrive-linux_0.13.1_all.deb
@@ -55,7 +55,7 @@ O smoke GTK4 não equivale a avaliação visual humana nem a autenticação Goog
 
 ## Versionamento
 
-Até a v0.14.0, o aplicativo permanece **Alpha**. A promoção para uma versão pré-estável ou Beta depende de QA, especialmente autenticação com conta Google, compatibilidade em Zorin OS e confiabilidade de cópias.
+Até a v0.14.1, o aplicativo permanece **Alpha**. A promoção para uma versão pré-estável ou Beta depende de QA, especialmente autenticação com conta Google, compatibilidade em Zorin OS e confiabilidade de cópias.
 
 ## Identificação da conta no Zorin OS
 
@@ -132,7 +132,7 @@ A sincronização contínua processa **até 100 arquivos por ciclo** e registra 
 
 Em **Configurações → Diagnóstico de compatibilidade Zorin OS**, confirme a pasta gravável, a conta autorizada, FUSE e o timer. O botão para ativar a sincronização agora solicita o primeiro ciclo imediatamente, e **Ver status do serviço** avisa se o timer real do Linux não está ativo. Mesmo com timer ativo, **um erro 403 impede transferir** até a API aceitar novamente.
 
-## Prioridades alta e média inspiradas no Insync — v0.14.0 Alpha
+## Prioridades alta e média inspiradas no Insync — v0.14.1 Alpha
 
 ### Inicialização automática do disco virtual
 Em **Disco virtual**, ative **Montar Drive automaticamente ao entrar no Linux**. O aplicativo usa `systemctl --user enable gdrive-linux-mount.service` e solicita a montagem atual de forma assíncrona. O serviço foi configurado com `Type=notify`, ou seja, não deve anunciar a montagem como pronta antes do rclone confirmar o FUSE. Ao entrar novamente no Zorin OS, a montagem será solicitada automaticamente, mesmo sem abrir a janela GTK4. O serviço exige sessão de usuário Linux, FUSE e conectividade; se a rede falhar tentará novamente com intervalo conservador. Desativar o controle também solicita a desmontagem da unidade atual.
@@ -161,3 +161,35 @@ Na nova seção **Documentos Google**, exporte cópias em **LibreOffice/ODF**, *
 
 ### Homologação
 O QA no Ubuntu/Wayland e os testes do rclone com remotos locais são obrigatórios antes da entrega. **Ainda dependem do Zorin OS real**: autorização OAuth do Google, montagem FUSE após login, suporte do painel ao AppIndicator, acesso a arquivos compartilhados com permissões específicas, e exportação de documentos nativos reais. O software permanece Alpha enquanto esses cenários não forem confirmados.
+
+
+## Correções da montagem no Zorin OS — v0.14.1 Alpha
+
+Esta atualização responde ao erro **“Não foi possível montar”** que apareceu no teste. A montagem continua usando rclone/FUSE e `systemd --user` com `Type=notify`, como recomendado pelo rclone. Os ajustes incluem:
+
+- Um **PATH conhecido no serviço** (`/usr/local/bin:/usr/bin:/bin`), evitando que a janela encontre o rclone enquanto o systemd não encontra.
+- Espera de até **180 segundos no serviço** e 205 segundos na execução da interface, sem declarar falha por um limite menor que o do próprio serviço.
+- Conferência da **conta existente na configuração do rclone**, localmente e sem solicitar informações da API Google, antes de criar a pasta de montagem.
+- Verificação da propriedade, escrita e conteúdo da pasta `~/DriveOnline/<conta>`; o aplicativo nunca a esvazia automaticamente.
+- Recuperação de estados `failed` do serviço antes de uma nova tentativa, sem apagar caches, arquivos ou unidades.
+- Nova seção **Disco virtual → Verificação de montagem do Zorin OS**, com diagnósticos que não incluem credenciais ou conteúdo bruto dos logs.
+- Botão **Testar acesso Google (consulta sem alterações)**: faz **uma única consulta** para distinguir falha de autenticação/cota de falha FUSE. Não use repetidamente quando já houver aviso de 403.
+
+### Passo a passo seguro
+
+1. Instale o novo pacote da execução de QA aprovada. Abra o aplicativo normalmente, como usuário, sem executar `sudo gdrive-linux`.
+2. Entre em **Disco virtual** e clique em **Diagnosticar requisitos de montagem**. A lista mostra o componente indisponível e sua correção.
+3. Se o rclone estiver ausente, instale-o em `/usr/bin` ou `/usr/local/bin`; se faltar FUSE, execute `sudo apt install fuse3` e confirme a existência de `/dev/fuse`.
+4. Se a verificação local passar, pressione **Testar acesso Google** **uma vez**. Se houver erro 403, configure um Client ID/Secret OAuth Desktop próprio no rclone e aguarde a recuperação da cota. **A montagem não funcionará enquanto a API bloquear a conta**.
+5. Clique **Montar Drive**, aguarde a confirmação e depois **Abrir disco no gerenciador**. Se quiser criar, modificar e excluir dentro do disco online, marque **Permitir modificar arquivos** e clique em **Aplicar gravação e remontar**. Isso é distinto da pasta espelhada `~/GoogleDrive`.
+6. Somente depois de o disco montar manualmente, habilite **Montar automaticamente ao entrar no Linux** para a sessão seguinte.
+
+Se a GUI não iniciar, o diagnóstico também pode ser consultado sem usar a rede:
+
+```bash
+python3 /usr/share/gdrive-linux/mount_checks.py
+```
+
+Para verificar o serviço manualmente: `systemctl --user status gdrive-linux-mount.service`. Registros de `journalctl` podem conter nomes de arquivos e outros dados pessoais: **não publique o log bruto nem seu rclone.conf**. Prefira compartilhar apenas a mensagem resumida pela GUI.
+
+**Limites da validação:** os testes automatizados confirmam a estrutura do serviço, segurança, diagnósticos e inicialização GTK4; o teste FUSE com um remoto local só executa quando o runner oferece `/dev/fuse`. A montagem real do Google Drive e o funcionamento após login no Zorin continuam necessitando teste no computador.
