@@ -19,7 +19,7 @@ from rclone_backend import list_remotes, remote_path
 from settings import load_settings
 from sync_plan import local_inventory, remote_inventory, validate_relative
 from sync_filters import filtered_inventory, parse_rules
-from sync_profiles import effective_profiles, get_profile_mode
+from sync_profiles import effective_profiles, get_profile_mode, ensure_external_volume_present
 from rclone_errors import (rclone_limits, is_rate_limit, friendly,
                            cooldown_active, quota_retry_after)
 
@@ -214,6 +214,7 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
                          "não sincronize a pasta pessoal inteira ou pastas de backup.")
     if not folder.is_dir():
         raise ValueError("A pasta escolhida está indisponível; nenhuma ação executada")
+    ensure_external_volume_present(folder)
     if remote not in list_remotes():
         raise ValueError("Conta rclone não disponível")
     state_base.mkdir(parents=True, mode=0o700, exist_ok=True)
