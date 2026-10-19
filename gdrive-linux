@@ -259,6 +259,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         account_card.append(label(
             "O nome mostrado é o identificador do rclone, não necessariamente o e-mail Google.",
             "drive-small-note", wrap=True))
+        account_card.append(action("Corrigir bloqueio Google 403 (Client ID próprio)",
+                                   self.quota_help, "dialog-warning-symbolic"))
         account_card.append(action("Conectar outra conta", self.connect_google,
                                    "list-add-symbolic", primary=True))
         folder_card = card("Diretório local",
@@ -332,6 +334,11 @@ class DriveWindow(Gtk.ApplicationWindow):
 
     def build_sync(self):
         sync_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        self.sync_paths = label("Pasta espelhada local: " + str(self.folder) +
+                                " — você pode criar e editar arquivos diretamente aqui. "
+                                "Disco virtual online: em outra pasta, pode estar em somente leitura.",
+                                "drive-status", wrap=True)
+        sync_page.append(self.sync_paths)
         automatic = card("Sincronização contínua",
             "Aproximadamente a cada minuto, mesmo com esta janela fechada (sessão Linux ativa).",
             "view-refresh-symbolic")
@@ -419,6 +426,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         scroll.set_vexpand(True)
         scroll.set_child(self.log)
         logs.append(scroll)
+        logs.append(action("Ajuda para erro 403 do Google Drive", self.quota_help,
+                           "dialog-warning-symbolic"))
         activity_page.append(logs)
         self.pages.add_titled(activity_page, "activity", "Transferências")
 
@@ -936,6 +945,9 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.persist()
         self.verify_generation += 1
         remote = self.selected_remote()
+        self.sync_paths.set_text("Conta: " + str(self.selected_remote() or "nenhuma") +
+            " • Pasta espelhada local: " + str(self.folder) +
+            " • Disco virtual online: seção Disco virtual.")
         self.account_identity.set_text(
             ("Conta selecionada: " + self.account_display(remote))
             if remote else "Nenhuma conta selecionada")
@@ -1180,6 +1192,8 @@ class DriveWindow(Gtk.ApplicationWindow):
                     self.folder = Path(file.get_path())
                     self.folder_label.set_text(str(self.folder))
                     self.home_folder.set_text(str(self.folder))
+                    self.sync_paths.set_text("Pasta local editável: " + str(self.folder) +
+                        " • Disco virtual do Drive: seção Disco virtual.")
                     self.preview_generation += 1
                     self.persist()
                     self.notice("Pasta selecionada: " + str(self.folder), "success")
@@ -1285,6 +1299,35 @@ class DriveWindow(Gtk.ApplicationWindow):
             Gio.AppInfo.launch_default_for_uri(self.folder.resolve().as_uri(), None)
         except (GLib.Error, OSError) as exc:
             self.status.set_text("Falha ao abrir pasta: " + str(exc))
+
+    def quota_help(self, *_):
+        dialog = Gtk.Window(title="Corrigir limite 403 do Google Drive",
+                            transient_for=self, modal=True)
+        dialog.set_default_size(610, 420)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        for edge in ("top", "bottom", "start", "end"):
+            getattr(box, "set_margin_" + edge)(20)
+        dialog.set_child(box)
+        box.append(section_title("A cota do cliente compartilhado foi excedida",
+            "O Google está bloqueando solicitações desta aplicação OAuth. "
+            "Diminuir consultas ajuda, mas pode não recuperar a chave compartilhada. "
+            "É recomendado configurar um Client ID e um Client Secret próprios."))
+        for step in (
+            "1. Abra o guia oficial abaixo e crie credenciais OAuth do tipo Desktop no Google Cloud.",
+            "2. No assistente do rclone, edite a conta existente (meu_drive): preencha Client ID e Client Secret.",
+            "3. Reconecte/autentique essa conta pelo navegador e confirme o acesso.",
+            "4. Aguarde o fim do bloqueio temporário e clique em Verificar acesso à conta."
+        ):
+            box.append(label(step, "drive-muted", wrap=True))
+        link = Gtk.LinkButton.new_with_label(
+            "https://rclone.org/drive/#making-your-own-client-id",
+            "Abrir instruções oficiais para Client ID próprio")
+        link.set_halign(Gtk.Align.START)
+        box.append(link)
+        box.append(action("Abrir configuração avançada do rclone", self.configure,
+                          "utilities-terminal-symbolic", primary=True))
+        box.append(action("Fechar", lambda *_: dialog.close()))
+        dialog.present()
 
     def archive_changed(self, switch, *_):
         if self.restoring_auto:
