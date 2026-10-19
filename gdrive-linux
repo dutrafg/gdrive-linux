@@ -209,6 +209,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         folder_buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         folder_buttons.append(action("Escolher", self.choose_folder, "folder-open-symbolic"))
         folder_buttons.append(action("Abrir", self.open_local_folder, "go-jump-symbolic"))
+        folder_buttons.append(action("Criar pasta padrão", self.create_default_folder, "folder-new-symbolic"))
         folder_card.append(folder_buttons)
         accounts_page.append(self.make_columns(account_card, folder_card))
         manual = card("Transferências manuais",
@@ -469,6 +470,21 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.path_parts.pop()
         self.browse()
 
+    def create_default_folder(self, *_):
+        """Create only the user's explicit default directory after a click."""
+        target = Path.home() / "GoogleDrive"
+        try:
+            if target.exists() and not target.is_dir():
+                raise OSError("O caminho existe, mas não é uma pasta.")
+            target.mkdir(mode=0o700, exist_ok=True)
+            self.folder = target
+            self.folder_label.set_text(str(self.folder))
+            self.home_folder.set_text(str(self.folder))
+            self.persist()
+            self.notice("Pasta local pronta: " + str(target), "success")
+        except OSError as exc:
+            self.notice("Não foi possível criar a pasta: " + str(exc), "error")
+
     def choose_folder(self, *_):
         dialog = Gtk.FileChooserNative(title="Escolher pasta local", transient_for=self,
                                       action=Gtk.FileChooserAction.SELECT_FOLDER,
@@ -569,7 +585,7 @@ class DriveWindow(Gtk.ApplicationWindow):
     def open_local_folder(self, *_):
         try:
             if not self.folder.is_dir():
-                self.status.set_text("Escolha uma pasta local existente.")
+                self.notice("Escolha ou crie uma pasta local existente.", "warning")
                 return
             Gio.AppInfo.launch_default_for_uri(self.folder.resolve().as_uri(), None)
         except (GLib.Error, OSError) as exc:
