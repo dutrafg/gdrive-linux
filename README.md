@@ -14,11 +14,13 @@ python3 gdrive-linux
 
 Configure a conta pelo botão **Configurar** ou com `rclone config`.
 
-## Recursos atuais (0.2.0 Alpha)
+## Recursos atuais (0.3.1 Alpha)
 - Seleção de conta configurada no rclone
 - Seleção de pasta local
 - Enviar e baixar usando `rclone copy`
 - Logs e cancelamento
+- Navegação de pastas remotas com atualização assíncrona
+- Proteção contra resultados obsoletos ao trocar de pasta ou conta
 
 **Atenção:** `copy` não exclui arquivos do destino, mas pode substituir arquivos de mesmo nome. Ainda não existe sincronização bidirecional, montagem de unidade virtual ou atualização automática instalada. Faça backup antes de testar com dados importantes. Não publique seu `rclone.conf`.
 
