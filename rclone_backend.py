@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 from rclone_errors import rclone_limits
 
-REMOTE_RE = re.compile(r'^[^:\x00-\x1f\x7f/\\]+
+REMOTE_RE = re.compile(r'^[^:\x00-\x1f\x7f/\\]+$')
 
 def remote_path(name, relative=''):
     if (not isinstance(name, str) or not REMOTE_RE.fullmatch(name)
