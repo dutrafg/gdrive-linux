@@ -26,23 +26,34 @@ def load_settings():
         from sync_filters import parse_rules
         result["sync_includes"] = parse_rules(data.get("sync_includes", []))
         result["sync_excludes"] = parse_rules(data.get("sync_excludes", []))
+        from sync_profiles import validate_mode, validate_profiles
+        result["sync_mode"] = validate_mode(data.get("sync_mode", "bidirectional"))
+        result["sync_profiles"] = validate_profiles(data.get("sync_profiles", []))
+        result["profiles_configured"] = data.get("profiles_configured") is True
         return result
     except (OSError, ValueError, TypeError):
         return {}
 
 def save_settings(folder, account="", account_names=None, auto_sync_enabled=False,
                   mount_read_only=True, auto_archive_deletions=False,
-                  sync_includes=None, sync_excludes=None):
+                  sync_includes=None, sync_excludes=None,
+                  sync_mode="bidirectional", sync_profiles=None,
+                  profiles_configured=False):
     CONFIG_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(CONFIG_DIR, 0o700)
     from sync_filters import parse_rules
     includes = parse_rules(sync_includes)
     excludes = parse_rules(sync_excludes)
+    from sync_profiles import validate_profiles, validate_mode
+    profiles = validate_profiles(sync_profiles)
+    mode = validate_mode(sync_mode)
     payload_data = {"folder": str(folder), "account": account,
                     "auto_sync_enabled": auto_sync_enabled is True,
                     "mount_read_only": mount_read_only is not False,
                     "auto_archive_deletions": auto_archive_deletions is True,
-                    "sync_includes": includes, "sync_excludes": excludes}
+                    "sync_includes": includes, "sync_excludes": excludes,
+                    "sync_mode": mode, "sync_profiles": profiles,
+                    "profiles_configured": profiles_configured is True}
     if account_names:
         payload_data["account_names"] = {
             k: v for k, v in account_names.items()
