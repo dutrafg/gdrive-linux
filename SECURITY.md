@@ -77,3 +77,12 @@ Use uma conta e pasta de testes, confirme origem e destino, mantenha backup sepa
 - A integração com Zorin Files só altera o favorito específico de `~/DriveOnline/<conta>` no arquivo de bookmarks GTK, preservando os demais favoritos. Não executa ações de nuvem.
 - A exportação de documentos copia arquivos ao disco fora do espelhamento, valida o backend Drive, limita o tipo de formato e não faz upload, exclusões nem conversão reversa. Revise o conteúdo exportado antes de compartilhar cópias locais.
 - A compatibilidade plena com Google Drive para Windows, presença Office, Google Photos integral, permissões de unidades compartilhadas e integração nativa de ícones por arquivo permanece não garantida.
+
+
+## Diagnóstico seguro do disco virtual — v0.14.1
+
+A GUI inclui verificação local de rclone, nome remoto, FUSE, permissões e `systemd --user`, sem transmitir nomes de arquivos à nuvem. A prova remota de acesso é uma consulta **manual, explícita, somente leitura** e com erros normalizados, nunca com JSON bruto ou token exibido. O serviço usa PATH e HOME explícitos do usuário para evitar configurações divergentes entre GTK e systemd.
+
+Não são executados `chmod -R`, `chown -R`, `fusermount -uz` automático, remoções de diretórios de montagem ou limpeza de cache como métodos de reparo: essas operações podem comprometer edições que ainda não chegaram ao Google. Pastas não vazias ou de propriedade de outro usuário são recusadas. A montagem usa `Type=notify` e a GUI confere se o ponto FUSE realmente está montado.
+
+Não compartilhar `rclone.conf` ou logs do journal completos: eles podem expor dados pessoais e metadados. O recurso 403 não é solucionado automaticamente; o usuário precisa de autorização OAuth compatível e cota disponível.
