@@ -13,8 +13,9 @@ Environment=HOME=%h
 WorkingDirectory=%h
 ExecStart=/usr/bin/python3 /usr/share/gdrive-linux/mount_drive.py --serve
 TimeoutStartSec=180
+TimeoutStopSec=180
 Restart=on-failure
-RestartSec=300s
+RestartSec=900s
 Nice=5
 
 [Install]
