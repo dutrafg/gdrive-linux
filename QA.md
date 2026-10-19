@@ -92,7 +92,7 @@ O GitHub Actions testa os comandos FUSE e do Google Photos sem credenciais reais
 **Os testes automatizados com remotos locais não equivalem à homologação com conta Google e Zorin OS físicos.**
 
 
-## Correção FUSE do Zorin OS — v0.14.2 Alpha
+## Correção FUSE do Zorin OS — v0.14.3 Alpha
 
 - [ ] `test_mount_drive`: remoto inexistente no rclone impede iniciar serviço sem criar pasta fantasma; pasta vazia com outro proprietário ou sem escrita recusa montagem.
 - [ ] `test_mount_checks`: diagnóstico local sem API Google e classificação de 403 sem expor tokens; botão de consulta remota usa somente leitura.
@@ -107,10 +107,24 @@ O GitHub Actions testa os comandos FUSE e do Google Photos sem credenciais reais
 
 **Regra de homologação:** não chamar a correção de estável apenas porque os testes da GitHub Actions ficaram verdes; sem reproduzir e testar no Zorin físico, o bloqueio de API e as permissões locais permanecem desconhecidos.
 
-## Ciclo adicional de vinte etapas (v0.14.2 Alpha)
+## Ciclo adicional de vinte etapas (v0.14.3 Alpha)
 
 **Etapas 1–10, antes do QA intermediário:** bloqueio da troca de conta sob FUSE; proteção da pasta espelhada; recusa de raiz de montagem simbólica; verificação de acesso ao FUSE; dependências obrigatórias no Debian; desativação de autostart sem desmontagem; retentativas espaçadas; novos testes de permissões; execução do diagnóstico a partir do pacote instalado; QA completo do GitHub Actions #355 (aprovado).
 
 **Etapas 11–20, após o QA intermediário:** cache VFS explícito; RCLONE_CONFIG local respeitado; alerta de configuração não herdada pelo systemd; distinção entre FUSE montado e Google acessível; verificação de bibliotecas GTK3/Ayatana; controle do indicador quando ausente; classificação apenas de falhas recentes do journal; contagem anônima de contas no indicador; copiar diagnóstico normalizado; cobertura ampliada de testes e documentação final.
 
 **Critérios de conclusão:** testes Python e rclone local, Wayland/GTK4, verificação de systemd e instalação Debian precisam passar. Teste FUSE com remoto local é condicional à presença de /dev/fuse e pode ser SKIP no CI. Acesso e montagem com conta Google real no Zorin devem ser validados no computador do usuário, não presumidos.
+
+## QA adicional de integridade — v0.14.3 Alpha
+
+- [x] Teste Python: nomes de remotos com caracteres de controle e opções iniciadas em `-` são rejeitados.
+- [x] Teste Python: configuração gravada por múltiplas threads permanece JSON completo, privado e sem arquivos temporários abandonados.
+- [x] Testes com rclone local: fila maior que o limite por ciclo produz estado **parcial** até todos os arquivos serem processados.
+- [x] Testes com rclone local: envio e download unidirecionais ignoram a direção contrária e informam quantos itens não foram transferidos.
+- [x] Teste Python: erro de quota ou de execução retorna código não zero ao serviço de sincronização no Linux.
+- [x] Teste Python: resultado por conta e alerta de última atividade não expõem caminhos locais ou registro bruto de tokens.
+- [ ] Reexecutar CI completo da revisão exata: sintaxe, testes, integração rclone, GTK4/Wayland, verificação systemd e instalação do `.deb`.
+- [ ] Validar FUSE/Google OAuth real no computador com Zorin OS: não há acesso a esse ambiente pelo CI.
+- [ ] Confirmar visualmente a indicação de sincronização parcial, as mensagens por conta e o aviso de atividade atrasada na sessão Zorin real.
+
+O checklist de código acima representa testes escritos e integrados ao pipeline, não um atestado de execução bem-sucedida da **última** revisão enquanto seu workflow estiver pendente. Não divulgar versão como aprovada antes da execução de CI correspondente.
