@@ -20,9 +20,10 @@ from photos_export import upload_media
 from desktop_files import find_openable_file
 from deletion_review import load_candidates, archive_deletion
 from diagnostics import collect_diagnostics, format_report
+from rclone_errors import friendly, is_rate_limit
 from ui_kit import label, card, action, nav, format_size, section_title, row, button_flow
 
-VERSION = "0.13.0"
+VERSION = "0.13.1"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -475,7 +476,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         readonly.connect("toggled", self.mount_write_toggled)
         intro.append(readonly)
         intro.append(label(
-            "O modo padrão é SOMENTE LEITURA. Para trabalhar em documentos, "
+            "Para CRIAR, EDITAR, RENOMEAR ou EXCLUIR no disco virtual, ative a gravação e REMONTE o Drive. O modo padrão é SOMENTE LEITURA. Para trabalhar em documentos, "
             "prefira a pasta espelhada. A gravação pela montagem usa cache FUSE "
             "e pode gerar conflitos com edições remotas.",
             "drive-muted", wrap=True))
@@ -659,6 +660,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             return
         self.mount_read_only = not checkbox.get_active()
         self.persist()
+        self.mount_status.set_text("Modo alterado. Desmonte e monte novamente para aplicar.")
         if not self.mount_read_only:
             self.notice("A gravação no disco virtual é experimental: "
                         "arquivos abertos podem sofrer conflitos.", "warning")
@@ -1324,6 +1326,10 @@ class DriveWindow(Gtk.ApplicationWindow):
         elif state == "conflicts":
             message = (str(status.get("conflicts", 0)) +
                        " conflito(s) pendente(s). " + str(status.get("time", "")))
+        elif state == "quota":
+            message = ("Google Drive bloqueou chamadas da API (403). " +
+                       "Próxima tentativa após: " + str(status.get("retry_after", "?")) +
+                       ". Configure Client ID próprio no rclone.")
         elif state == "error":
             message = "A última verificação falhou. Revise a conexão e a pasta."
         else:
@@ -1532,6 +1538,10 @@ class DriveWindow(Gtk.ApplicationWindow):
         return False
 
     def append(self, line):
+        if is_rate_limit(line):
+            line = friendly(line)
+        elif any(x in line.lower() for x in ("googleapis.com/google.rpc", "quota_limit_value", "quota_metric", "consumer:", "quota_location:")):
+            return False
         buf = self.log.get_buffer()
         buf.insert(buf.get_end_iter(), line + "\n")
         return False
@@ -1618,6 +1628,7 @@ class DriveWindow(Gtk.ApplicationWindow):
     def worker(self, command, generation):
         result = "Falha ao iniciar transferência."
         proc = None
+        quota_detected = False
         try:
             if self.cancel_requested:
                 result = "Transferência cancelada."
@@ -1629,6 +1640,11 @@ class DriveWindow(Gtk.ApplicationWindow):
             if self.cancel_requested:
                 proc.terminate()
             for line in proc.stdout:
+                if is_rate_limit(line):
+                    quota_detected = True
+                    continue
+                if quota_detected and (line.lstrip().startswith("{") or "quota_" in line.lower() or "googleapis" in line.lower()):
+                    continue
                 progress = parse_progress(line)
                 if progress is not None:
                     GLib.idle_add(self.update_progress, progress, generation)
@@ -1637,7 +1653,8 @@ class DriveWindow(Gtk.ApplicationWindow):
             code = proc.wait()
             result = ("Transferência cancelada." if self.cancel_requested else
                       "Transferência concluída." if code == 0 else
-                      "Transferência falhou (código " + str(code) + ").")
+                      friendly("RATE_LIMIT_EXCEEDED") if quota_detected else
+                      "Transferência falhou (código " + str(code) + "). Verifique a conta e o espaço disponível.")
         except OSError as exc:
             result = "Falha na transferência: " + str(exc)
         finally:
