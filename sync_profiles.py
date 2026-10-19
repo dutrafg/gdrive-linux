@@ -22,6 +22,9 @@ def normalize_profile(item):
     folder = Path(value).expanduser().resolve()
     if folder == Path(folder.anchor):
         raise ValueError("Não sincronize a raiz do disco.")
+    online = (Path.home() / "DriveOnline").resolve()
+    if folder == online or online in folder.parents:
+        raise ValueError("Não sincronize a montagem FUSE dentro do espelho local.")
     return {
         "account": remote, "folder": str(folder),
         "mode": validate_mode(item.get("mode", "bidirectional")),
@@ -71,3 +74,19 @@ def effective_profiles(settings):
 
 def get_profile_mode(settings):
     return validate_mode(settings.get("mode", "bidirectional"))
+
+def ensure_external_volume_present(folder):
+    """Prevent writing into a removable-drive mountpoint when unplugged."""
+    folder = Path(folder).expanduser().resolve()
+    parts = folder.parts
+    expected = None
+    # Zorin/GNOME: /media/<user>/<disk>/<directory>
+    if len(parts) >= 4 and parts[1] == "media":
+        expected = Path("/", *parts[1:4])
+    # Some other Linux desktops: /run/media/<user>/<disk>/...
+    elif len(parts) >= 5 and parts[1:3] == ("run", "media"):
+        expected = Path("/", *parts[1:5])
+    if expected is not None and not expected.is_mount():
+        raise ValueError("O disco externo selecionado não está montado. "
+                         "Conecte-o antes de sincronizar; nenhum arquivo será alterado.")
+    return True
