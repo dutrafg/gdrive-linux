@@ -1,5 +1,6 @@
 """Multi-account, direction, external drive and safe filtering tests."""
 import os
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -55,6 +56,7 @@ class ProfileTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 parse_entry(value)
 
+@unittest.skipUnless(shutil.which("rclone"), "requires rclone installed")
 class MultiAccountRcloneIntegration(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
