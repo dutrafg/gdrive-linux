@@ -23,18 +23,25 @@ def load_settings():
         result["auto_sync_enabled"] = data.get("auto_sync_enabled") is True
         result["mount_read_only"] = data.get("mount_read_only") is not False
         result["auto_archive_deletions"] = data.get("auto_archive_deletions") is True
+        result["sync_includes"] = data.get("sync_includes", [])
+        result["sync_excludes"] = data.get("sync_excludes", [])
         return result
     except (OSError, ValueError, TypeError):
         return {}
 
 def save_settings(folder, account="", account_names=None, auto_sync_enabled=False,
-                  mount_read_only=True, auto_archive_deletions=False):
+                  mount_read_only=True, auto_archive_deletions=False,
+                  sync_includes=None, sync_excludes=None):
     CONFIG_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(CONFIG_DIR, 0o700)
+    from sync_filters import parse_rules
+    includes = parse_rules(sync_includes)
+    excludes = parse_rules(sync_excludes)
     payload_data = {"folder": str(folder), "account": account,
                     "auto_sync_enabled": auto_sync_enabled is True,
                     "mount_read_only": mount_read_only is not False,
-                    "auto_archive_deletions": auto_archive_deletions is True}
+                    "auto_archive_deletions": auto_archive_deletions is True,
+                    "sync_includes": includes, "sync_excludes": excludes}
     if account_names:
         payload_data["account_names"] = {
             k: v for k, v in account_names.items()
