@@ -80,12 +80,12 @@ jobs:
       - name: Validate Debian package metadata and contents
         run: |
           set -eu
-          dpkg-deb --info gdrive-linux_0.11.2_all.deb
-          dpkg-deb --contents gdrive-linux_0.11.2_all.deb
-          test "$(dpkg-deb -f gdrive-linux_0.11.2_all.deb Package)" = "gdrive-linux"
-          test "$(dpkg-deb -f gdrive-linux_0.11.2_all.deb Version)" = "0.11.2"
+          dpkg-deb --info gdrive-linux_0.12.0_all.deb
+          dpkg-deb --contents gdrive-linux_0.12.0_all.deb
+          test "$(dpkg-deb -f gdrive-linux_0.12.0_all.deb Package)" = "gdrive-linux"
+          test "$(dpkg-deb -f gdrive-linux_0.12.0_all.deb Version)" = "0.12.0"
           mkdir -p /tmp/gdrive-deb-check
-          dpkg-deb -x gdrive-linux_0.11.2_all.deb /tmp/gdrive-deb-check
+          dpkg-deb -x gdrive-linux_0.12.0_all.deb /tmp/gdrive-deb-check
           test -x /tmp/gdrive-deb-check/usr/bin/gdrive-linux
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/gdrive-linux
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/rclone_backend.py
@@ -105,13 +105,13 @@ jobs:
       - name: Install Debian package and verify launcher
         run: |
           set -eu
-          sudo apt-get install -y ./gdrive-linux_0.11.2_all.deb
+          sudo apt-get install -y ./gdrive-linux_0.12.0_all.deb
           test "$(dpkg-query -W -f='${Status}' gdrive-linux)" = "install ok installed"
-          test "$(dpkg-query -W -f='${Version}' gdrive-linux)" = "0.11.2"
+          test "$(dpkg-query -W -f='${Version}' gdrive-linux)" = "0.12.0"
           test -x /usr/bin/gdrive-linux
-          dpkg-deb -f gdrive-linux_0.11.2_all.deb Depends | grep -q 'gir1.2-gtk-4.0'
-          ! dpkg-deb -f gdrive-linux_0.11.2_all.deb Depends | grep -q 'rclone'
-          dpkg-deb -f gdrive-linux_0.11.2_all.deb Recommends | grep -q 'rclone'
+          dpkg-deb -f gdrive-linux_0.12.0_all.deb Depends | grep -q 'gir1.2-gtk-4.0'
+          ! dpkg-deb -f gdrive-linux_0.12.0_all.deb Depends | grep -q 'rclone'
+          dpkg-deb -f gdrive-linux_0.12.0_all.deb Recommends | grep -q 'rclone'
           test -f /usr/share/gdrive-linux/gdrive-linux
           test -f /usr/share/gdrive-linux/style.css
           test -f /usr/share/gdrive-linux/ui_kit.py
@@ -120,4 +120,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: gdrive-linux-deb
-          path: gdrive-linux_0.11.2_all.deb
+          path: gdrive-linux_0.12.0_all.deb
