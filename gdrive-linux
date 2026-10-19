@@ -296,6 +296,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         toolbar.append(self.path_label)
         toolbar.append(action("Atualizar", self.browse, "view-refresh-symbolic"))
         files_card.append(toolbar)
+        files_card.append(action("Abrir documento selecionado no aplicativo padrão",
+                                 self.open_selected_document, "document-open-symbolic"))
         search_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.search_entry = Gtk.Entry()
         self.search_entry.set_placeholder_text("Buscar arquivos nesta conta Google")
@@ -772,6 +774,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.home_accounts.set_text(self.account_display(remote)
                                     if remote else "Nenhuma conta conectada")
         self.path_parts = []
+        self.search_mode = False
         self.browse_generation += 1
         self.preview_generation += 1
         self.sync_report.set_text("Selecione Simular para comparar esta conta.")
@@ -858,6 +861,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.notice("Informe pelo menos dois caracteres para pesquisar.", "warning")
             return
         self.browse_generation += 1
+        self.search_mode = True
         generation = self.browse_generation
         self.files_summary.set_text("Pesquisando arquivos remotos…")
         self.notice("Pesquisando sem transferir arquivos…")
@@ -872,6 +876,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             GLib.idle_add(self.show_browse_error, str(exc), generation)
 
     def browse(self, *_):
+        self.search_mode = False
         remote = self.selected_remote()
         if not remote:
             self.notice("Conecte uma conta antes de navegar.", "warning")
@@ -907,6 +912,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         for entry in sorted(entries, key=lambda item: (not item["directory"], item["name"].casefold())):
             file_row = Gtk.ListBoxRow()
             file_row.entry_name = entry["name"]
+            file_row.entry_path = (entry["name"] if self.search_mode else
+                                  "/".join(self.path_parts + [entry["name"]]))
             file_row.is_directory = entry["directory"]
             contents = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
             icon = Gtk.Image.new_from_icon_name(
@@ -932,6 +939,32 @@ class DriveWindow(Gtk.ApplicationWindow):
         if row.is_directory:
             self.path_parts.append(row.entry_name)
             self.browse()
+        else:
+            self.open_selected_document(row=row)
+
+    def open_selected_document(self, _button=None, row=None):
+        item = row or self.files_list.get_selected_row()
+        if item is None:
+            self.notice("Selecione um arquivo na lista para abrir.", "warning")
+            return
+        if item.is_directory:
+            self.notice("Selecione um arquivo; pastas abrem com duplo clique.", "warning")
+            return
+        relative = getattr(item, "entry_path", item.entry_name)
+        try:
+            file = find_openable_file(relative, self.folder,
+                                      self.selected_remote(), MOUNT_ROOT)
+            if file is None:
+                self.notice(
+                    "Arquivo ainda não está disponível localmente. "
+                    "Baixe-o para a pasta espelhada ou monte o disco virtual.",
+                    "warning")
+                return
+            Gio.AppInfo.launch_default_for_uri(file.as_uri(), None)
+            self.notice("Abrindo " + file.name + " no aplicativo padrão do Linux.",
+                        "success")
+        except (OSError, ValueError, GLib.Error) as exc:
+            self.notice("Falha ao abrir o arquivo: " + str(exc), "error")
 
     def go_back(self, *_):
         if self.path_parts:
@@ -1534,7 +1567,8 @@ def ui_smoke():
     if not app.register(None):
         raise RuntimeError("GTK4 application registration failed")
     window = DriveWindow(app)
-    expected = ("home", "accounts", "files", "sync", "activity", "history", "settings")
+    expected = ("home", "accounts", "files", "sync", "activity", "history",
+                "settings", "mount", "photos")
     if not window.has_css_class("drive-window"):
         raise AssertionError("Missing application CSS class")
     for page in expected:
