@@ -523,6 +523,197 @@ class DriveWindow(Gtk.ApplicationWindow):
         page.append(limits)
         self.pages.add_titled(page, "photos", "Google Fotos")
 
+    def mount_write_toggled(self, checkbox):
+        if self.mount_busy:
+            self.notice("Espere a montagem/desmontagem terminar.", "warning")
+            return
+        self.mount_read_only = not checkbox.get_active()
+        self.persist()
+        if not self.mount_read_only:
+            self.notice("A gravação no disco virtual é experimental: "
+                        "arquivos abertos podem sofrer conflitos.", "warning")
+        else:
+            self.notice("Modo somente leitura será aplicado na próxima montagem.")
+
+    def refresh_mount_status(self, *_):
+        remote = self.selected_remote()
+        if not remote:
+            self.mount_info.set_text("Selecione uma conta em Contas primeiro.")
+            self.mount_status.set_text("Nenhuma conta selecionada.")
+            return
+        try:
+            target = mount_path(remote)
+        except ValueError as exc:
+            self.mount_status.set_text(str(exc))
+            return
+        self.mount_info.set_text("Pasta online: " + str(target))
+        self.mount_status.set_text("Verificando FUSE e serviço do Linux…")
+        threading.Thread(target=self.mount_status_worker,
+                         args=(target,), daemon=True).start()
+
+    def mount_status_worker(self, target):
+        try:
+            result = subprocess.run(
+                ["systemctl", "--user", "is-active", "gdrive-linux-mount.service"],
+                capture_output=True, text=True, timeout=8)
+            active = result.returncode == 0
+            mounted = target.is_mount()
+            if active and mounted:
+                message = "Disco virtual montado e disponível no gerenciador."
+            elif active:
+                message = "Serviço em execução; aguardando FUSE montar o disco."
+            else:
+                message = "Disco virtual desmontado. Clique em Montar Drive."
+        except (OSError, subprocess.SubprocessError):
+            message = "Serviço systemd do usuário não está disponível."
+        GLib.idle_add(self.mount_status.set_text, message)
+
+    def start_mount(self, *_):
+        if self.mount_busy:
+            return
+        remote = self.selected_remote()
+        if not remote:
+            self.notice("Selecione uma conta Google Drive.", "warning")
+            return
+        config = dict(self.preferences)
+        config.update({"account": remote, "folder": str(self.folder),
+                       "mount_read_only": self.mount_read_only})
+        try:
+            mount_command(config, require_tools=True, create=False)
+        except (ValueError, RuntimeError, OSError) as exc:
+            self.notice(str(exc), "error")
+            return
+        self.mount_busy = True
+        self.persist()
+        self.mount_status.set_text("Preparando montagem do Drive…")
+        threading.Thread(target=self.mount_action_worker, args=("start", remote),
+                         daemon=True).start()
+
+    def stop_mount(self, *_):
+        if self.mount_busy:
+            return
+        self.mount_busy = True
+        self.mount_status.set_text("Desmontando Drive…")
+        threading.Thread(target=self.mount_action_worker,
+                         args=("stop", self.selected_remote()), daemon=True).start()
+
+    def mount_action_worker(self, command, remote):
+        success = False
+        try:
+            reload = subprocess.run(
+                ["systemctl", "--user", "daemon-reload"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=12)
+            if reload.returncode:
+                raise RuntimeError("Não foi possível atualizar serviços do usuário.")
+            res = subprocess.run(
+                ["systemctl", "--user", command, "gdrive-linux-mount.service"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=35)
+            success = res.returncode == 0
+            if success and command == "start" and remote:
+                path = mount_path(remote)
+                for _ in range(12):
+                    if path.is_mount():
+                        break
+                    time.sleep(0.5)
+                success = path.is_mount()
+            message = ("Disco virtual " +
+                       ("montado." if command == "start" else "desmontado.")
+                       if success else
+                       "Não foi possível concluir a montagem. Verifique fuse3 e o rclone.")
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+            message = "Falha no disco virtual: " + str(exc)
+        GLib.idle_add(self.mount_action_complete, success, message)
+
+    def mount_action_complete(self, success, message):
+        self.mount_busy = False
+        self.notice(message, "success" if success else "error")
+        self.refresh_mount_status()
+        return False
+
+    def open_mount_folder(self, *_):
+        remote = self.selected_remote()
+        if not remote:
+            self.notice("Selecione uma conta para abrir o disco virtual.", "warning")
+            return
+        try:
+            folder = mount_path(remote)
+            if not folder.is_mount():
+                self.notice("Monte o disco virtual antes de abri-lo.", "warning")
+                return
+            Gio.AppInfo.launch_default_for_uri(folder.as_uri(), None)
+        except (GLib.Error, ValueError, OSError) as exc:
+            self.notice("Não foi possível abrir a pasta: " + str(exc), "error")
+
+    def selected_photos_remote(self):
+        index = self.photos_dropdown.get_selected()
+        if index == Gtk.INVALID_LIST_POSITION or index >= self.remotes.get_n_items():
+            return None
+        return self.remotes.get_string(index)
+
+    def preview_photos(self, *_):
+        remote = self.selected_photos_remote()
+        if not remote:
+            self.notice("Configure e selecione um remoto Google Photos.", "warning")
+            return
+        if self.photos_busy:
+            return
+        album = self.photos_album.get_text().strip()
+        self.photos_info.set_text("Procurando fotos e vídeos elegíveis…")
+        self.photos_busy = True
+        threading.Thread(target=self.photos_worker,
+                         args=(remote, album, True), daemon=True).start()
+
+    def confirm_photos(self, *_):
+        remote = self.selected_photos_remote()
+        if not remote or self.photos_busy:
+            self.notice("Selecione um remoto Google Photos e aguarde a operação atual.",
+                        "warning")
+            return
+        album = self.photos_album.get_text().strip()
+        dialog = Gtk.Window(title="Confirmar envio para Google Fotos",
+                            transient_for=self, modal=True)
+        dialog.set_default_size(470, 220)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        for prop in ("top", "bottom", "start", "end"):
+            getattr(box, "set_margin_" + prop)(20)
+        dialog.set_child(box)
+        box.append(section_title("Enviar fotos e vídeos",
+            "Esta ação envia arquivos da pasta local selecionada para o álbum " +
+            album + " no remoto " + remote +
+            ". Não faz exclusões nem restaura a biblioteca antiga."))
+        box.append(action("Cancelar", lambda *_: dialog.close()))
+        def submit(_button):
+            dialog.close()
+            self.photos_busy = True
+            self.photos_info.set_text("Enviando mídias, aguarde…")
+            threading.Thread(target=self.photos_worker,
+                             args=(remote, album, False), daemon=True).start()
+        box.append(action("Confirmar envio", submit, primary=True))
+        dialog.present()
+
+    def photos_worker(self, remote, album, dry_run):
+        try:
+            result = upload_media(self.folder, remote, album, dry_run=dry_run)
+            if result["state"] == "empty":
+                success, message = True, "Nenhuma foto ou vídeo elegível na pasta."
+            elif dry_run:
+                success, message = True, (
+                    str(result["candidates"]) +
+                    " mídias elegíveis. Nenhuma alteração foi feita.")
+            else:
+                success, message = True, (
+                    "Envio concluído pelo rclone. A API Google Photos pode limitar "
+                    "a confirmação de alguns itens; confira o álbum.")
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+            success, message = False, "Google Fotos: " + str(exc)
+        GLib.idle_add(self.photos_complete, success, message)
+
+    def photos_complete(self, success, message):
+        self.photos_busy = False
+        self.photos_info.set_text(message)
+        self.notice(message, "success" if success else "error")
+        return False
+
     def notice(self, message, tone=None):
         self.status.set_text(message)
         for css in ("drive-status-success", "drive-status-error", "drive-status-warning"):
