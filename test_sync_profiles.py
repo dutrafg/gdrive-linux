@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from sync_profiles import effective_profiles, validate_profiles, normalize_profile
+from sync_profiles import effective_profiles, validate_profiles, normalize_profile, ensure_external_volume_present
 from sync_filters import filtered_inventory, parse_entry
 from background_sync import run_profiles, run_once, read_json, job_key
 
@@ -44,6 +44,16 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(effective_profiles({
             "auto_sync_enabled": True,"sync_profiles": [],
             "profiles_configured": True}), [])
+
+    def test_missing_external_media_volume_is_refused(self):
+        with patch("sync_profiles.Path.is_mount", return_value=False):
+            with self.assertRaisesRegex(ValueError, "não está montado"):
+                ensure_external_volume_present("/media/testuser/UNPLUGGED/folder")
+
+    def test_rejects_virtual_drive_inside_mirror(self):
+        with self.assertRaisesRegex(ValueError, "montagem FUSE"):
+            normalize_profile({"account":"drive",
+                               "folder":str(Path.home()/"DriveOnline"/"drive")})
 
     def test_selective_ignore_patterns(self):
         inventory={"Documentos/cv.odt":1, "Documentos/file.tmp":2,
