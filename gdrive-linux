@@ -423,20 +423,29 @@ class DriveWindow(Gtk.ApplicationWindow):
     def show_files(self, entries, generation):
         if generation != self.browse_generation:
             return False
-        while row := self.files_list.get_row_at_index(0):
-            self.files_list.remove(row)
-        for entry in sorted(entries, key=lambda e: (not e["directory"], e["name"].casefold())):
-            row = Gtk.ListBoxRow()
-            row.entry_name = entry["name"]
-            row.is_directory = entry["directory"]
-            label = Gtk.Label(label=("📁 " if entry["directory"] else "📄 ") + entry["name"])
-            label.set_xalign(0)
-            label.set_margin_top(6)
-            label.set_margin_bottom(6)
-            label.set_margin_start(8)
-            row.set_child(label)
-            self.files_list.append(row)
-        self.status.set_text(f"{len(entries)} itens encontrados.")
+        while current := self.files_list.get_row_at_index(0):
+            self.files_list.remove(current)
+        for entry in sorted(entries, key=lambda item: (not item["directory"], item["name"].casefold())):
+            file_row = Gtk.ListBoxRow()
+            file_row.entry_name = entry["name"]
+            file_row.is_directory = entry["directory"]
+            contents = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+            icon = Gtk.Image.new_from_icon_name(
+                "folder-symbolic" if entry["directory"] else "text-x-generic-symbolic")
+            icon.set_pixel_size(20)
+            icon.add_css_class("drive-card-icon")
+            contents.append(icon)
+            name = label(entry["name"], hexpand=True)
+            name.set_ellipsize(3)
+            contents.append(name)
+            contents.append(label("Pasta" if entry["directory"] else
+                                  format_size(entry.get("size", 0)), "drive-muted"))
+            file_row.set_child(contents)
+            self.files_list.append(file_row)
+        self.files_summary.set_text(
+            str(len(entries)) + " item(ns). Duplo clique para abrir pastas."
+            if entries else "Esta pasta está vazia.")
+        self.notice(str(len(entries)) + " item(ns) encontrados.", "success")
         return False
 
     def open_folder(self, _listbox, row):
