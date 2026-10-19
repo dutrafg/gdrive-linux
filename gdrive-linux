@@ -394,6 +394,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.browse_generation += 1
         self.path_label.set_text("Meu Drive")
         self.back_button.set_sensitive(False)
+        self.files_summary.set_text("Clique em Atualizar para listar os arquivos.")
         while row := self.files_list.get_row_at_index(0):
             self.files_list.remove(row)
 
@@ -406,11 +407,12 @@ class DriveWindow(Gtk.ApplicationWindow):
     def browse(self, *_):
         remote = self.selected_remote()
         if not remote:
-            self.status.set_text("Configure uma conta antes de navegar.")
+            self.notice("Conecte uma conta antes de navegar.", "warning")
             return
         self.browse_generation += 1
         generation = self.browse_generation
-        self.status.set_text("Carregando arquivos…")
+        self.notice("Carregando arquivos da nuvem…")
+        self.files_summary.set_text("Consultando o Google Drive…")
         self.path_label.set_text("Meu Drive" + ((" / " + " / ".join(self.path_parts)) if self.path_parts else ""))
         self.back_button.set_sensitive(bool(self.path_parts))
         threading.Thread(target=self.browse_worker, args=(remote, "/".join(self.path_parts), generation), daemon=True).start()
@@ -424,7 +426,8 @@ class DriveWindow(Gtk.ApplicationWindow):
 
     def show_browse_error(self, message, generation):
         if generation == self.browse_generation:
-            self.status.set_text("Falha ao listar arquivos: " + message)
+            self.notice("Falha ao listar arquivos: " + message, "error")
+            self.files_summary.set_text("Não foi possível listar os arquivos.")
         return False
 
     def show_files(self, entries, generation):
@@ -717,7 +720,9 @@ class DriveWindow(Gtk.ApplicationWindow):
 
     def refresh_error(self, generation, message):
         if generation == self.refresh_generation:
-            self.status.set_text("Não foi possível consultar o rclone: " + message)
+            self.sidebar_rclone.set_text("●  rclone indisponível")
+            self.settings_rclone.set_text("rclone não encontrado. Instale para conectar e transferir.")
+            self.notice("Não foi possível consultar o rclone: verifique a instalação.", "error")
         return False
 
     def refresh_complete(self, generation, names):
@@ -731,10 +736,12 @@ class DriveWindow(Gtk.ApplicationWindow):
         finally:
             self.restoring_accounts = False
         self.account_changed()
-        self.home_accounts.set_text(str(len(names)) + " conta(s) disponíveis" if names else "Nenhuma conta conectada")
+        self.home_accounts.set_text((self.selected_remote() or str(len(names)) + " conta(s)") if names else "Nenhuma conta conectada")
+        self.sidebar_rclone.set_text("●  rclone disponível")
+        self.settings_rclone.set_text("rclone disponível • " + str(len(names)) + " conta(s) configurada(s)")
         self.status.set_text(
             str(len(names)) + " conta(s) disponível(is)." if names
-            else "Nenhuma conta configurada. Clique em Configurar."
+            else "Nenhuma conta configurada. Clique em Conectar Google."
         )
         return False
 
