@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from background_sync import (BACKUP_BASE, STATE_BASE, fingerprint, inventories,
-                             job_key, read_json, safe_local_target, local_md5,
+                             job_key, read_baseline, safe_local_target, local_md5,
                              save_private_json)
 from rclone_backend import list_remotes, remote_path
 from sync_plan import validate_relative
@@ -53,10 +53,7 @@ def find_deletions(local, cloud, baseline):
 
 def load_candidates(remote, folder, state_base=STATE_BASE):
     base = Path(folder).expanduser().resolve()
-    snapshot = read_json(state_base / (job_key(remote, base) + ".json"))
-    baseline = snapshot.get("md5", {})
-    if not isinstance(baseline, dict):
-        raise ValueError("Histórico de sincronização inválido.")
+    baseline = read_baseline(state_base / (job_key(remote, base) + ".json"))
     includes, excludes = selected_rules(remote, base)
     local, cloud = inventories(remote, base, includes, excludes)
     baseline = filtered_inventory(baseline, includes, excludes)
@@ -83,7 +80,7 @@ def archive_deletion(remote, folder, relative, missing_side,
         except BlockingIOError:
             raise RuntimeError("Aguarde o ciclo de sincronização atual.")
         snapshot_path = state_base / (key + ".json")
-        baseline = read_json(snapshot_path).get("md5", {})
+        baseline = read_baseline(snapshot_path)
         includes, excludes = selected_rules(remote, base)
         local, cloud = inventories(remote, base, includes, excludes)
         visible_baseline = filtered_inventory(baseline, includes, excludes)
