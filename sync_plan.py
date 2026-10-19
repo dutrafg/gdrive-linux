@@ -50,7 +50,9 @@ def local_inventory(folder):
 
 def remote_inventory(remote, timeout=120):
     from rclone_backend import remote_path
-    cmd = ["rclone", "lsjson", remote_path(remote), "--recursive", "--files-only", "--hash"]
+    cmd = ["rclone", "lsjson", remote_path(remote), "--recursive", "--files-only",
+           "--hash", "--exclude", "/.gdrive-linux-history/**",
+           "--exclude", "/.gdrive-linux-backups/**"]
     result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=timeout)
     records = json.loads(result.stdout)
     if not isinstance(records, list):
@@ -58,10 +60,12 @@ def remote_inventory(remote, timeout=120):
     found = {}
     for item in records:
         path = validate_relative(item["Path"])
+        if path.split("/", 1)[0] in (".gdrive-linux-history", ".gdrive-linux-backups"):
+            continue
         hashes = item.get("Hashes") or {}
-        digest = hashes.get("SHA-256") or hashes.get("MD5")
+        digest = hashes.get("MD5") or hashes.get("SHA-256")
         if digest:
-            found[path] = ("sha256" if hashes.get("SHA-256") else "md5", digest.lower())
+            found[path] = ("md5" if hashes.get("MD5") else "sha256", digest.lower())
         else:
             found[path] = ("metadata", str(item.get("Size")), str(item.get("ModTime")))
     return found
