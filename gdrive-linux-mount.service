@@ -9,5 +9,10 @@ Type=notify
 NotifyAccess=main
 ExecStart=/usr/bin/python3 /usr/share/gdrive-linux/mount_drive.py --serve
 TimeoutStartSec=120
-Restart=no
+Restart=on-failure
+RestartSec=120s
+StartLimitIntervalSec=0
 Nice=5
+
+[Install]
+WantedBy=default.target
