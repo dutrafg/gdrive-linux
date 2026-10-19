@@ -12,8 +12,9 @@ from settings import load_settings, save_settings
 from progress import parse_progress
 from google_oauth import google_config_command
 from sync_plan import local_inventory, remote_inventory, conservative_plan
+from safe_sync import execute_additions
 
-VERSION = "0.9.9"
+VERSION = "0.10.0"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -27,6 +28,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.cancel_requested = False
         self.progress_known = False
         self.transfer_generation = 0
+        self.sync_busy = False
         self.auto_enabled = False
         self.auto_generation = 0
         self.auto_interval_seconds = 300
@@ -99,6 +101,9 @@ class DriveWindow(Gtk.ApplicationWindow):
         preview = Gtk.Button(label="Simular sincronização bidirecional")
         preview.connect("clicked", self.preview_sync)
         accounts_page.append(preview)
+        safe_button = Gtk.Button(label="Transferir somente arquivos novos (sem sobrescrever)")
+        safe_button.connect("clicked", self.safe_sync)
+        accounts_page.append(safe_button)
 
         actions = Gtk.Box(spacing=8)
         accounts_page.append(actions)
@@ -272,6 +277,34 @@ class DriveWindow(Gtk.ApplicationWindow):
         dialog.connect("response", response)
         dialog.show()
 
+    def safe_sync(self, *_):
+        if self.busy or self.sync_busy:
+            self.status.set_text("Aguarde a operação atual.")
+            return
+        remote = self.selected_remote()
+        if not remote or not self.folder.is_dir():
+            self.status.set_text("Selecione uma conta e pasta local existente.")
+            return
+        self.sync_busy = True
+        self.status.set_text("Transferindo somente arquivos novos (máximo 100)…")
+        threading.Thread(target=self.safe_sync_worker,
+                         args=(remote, self.folder), daemon=True).start()
+
+    def safe_sync_worker(self, remote, folder):
+        try:
+            plan, completed = execute_additions(remote, folder, dry_run=False)
+            message = (str(completed) + " arquivos novos transferidos; " +
+                       str(len(plan.conflicts)) + " conflitos preservados.")
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+            message = "Sincronização seletiva interrompida: " + str(exc)
+        GLib.idle_add(self.finish_safe_sync, message)
+
+    def finish_safe_sync(self, message):
+        self.sync_busy = False
+        self.status.set_text(message)
+        self.append(message)
+        return False
+
     def preview_sync(self, *_):
         remote = self.selected_remote()
         if not remote or not self.folder.is_dir():
@@ -318,7 +351,7 @@ class DriveWindow(Gtk.ApplicationWindow):
     def auto_tick(self, generation):
         if not self.auto_enabled or generation != self.auto_generation:
             return False
-        if not self.busy and self.selected_remote() and self.folder.is_dir():
+        if not self.busy and not self.sync_busy and self.selected_remote() and self.folder.is_dir():
             self.transfer(None, "download", automatic=True)
         return True
 
@@ -422,7 +455,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         return False
 
     def transfer(self, _button, direction, automatic=False):
-        if self.busy:
+        if self.busy or self.sync_busy:
             return
         index = self.dropdown.get_selected()
         if index == Gtk.INVALID_LIST_POSITION or index >= self.remotes.get_n_items():
