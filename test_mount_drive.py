@@ -15,7 +15,7 @@ class MountTests(unittest.TestCase):
             self.assertEqual(cmd[:3], ["rclone", "mount", "pessoal:"])
             self.assertIn("--read-only", cmd)
             self.assertIn("--vfs-cache-mode", cmd)
-            self.assertIn("full", cmd)
+            self.assertIn("writes", cmd)
 
     def test_write_mode_explicit(self):
         with tempfile.TemporaryDirectory() as tmp:
