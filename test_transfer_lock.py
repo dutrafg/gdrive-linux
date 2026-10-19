@@ -1,6 +1,8 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+from background_sync import run_once
 
 from transfer_lock import profile_transfer_lock
 from background_sync import job_key
@@ -19,6 +21,22 @@ class TransferLockTests(unittest.TestCase):
                         pass
             with profile_transfer_lock("drive", local, state):
                 self.assertTrue((state / (job_key("drive", local) + ".lock")).exists())
+
+    @patch("background_sync.inventories")
+    @patch("background_sync.list_remotes", return_value=["demo"])
+    def test_systemd_cycle_recognizes_manual_transfer_lock(self, remotes, inventories):
+        with tempfile.TemporaryDirectory() as root:
+            base = Path(root)
+            folder = base / "local"
+            folder.mkdir()
+            state = base / "state"
+            with profile_transfer_lock("demo", folder, state):
+                result = run_once(
+                    config={"account": "demo", "folder": str(folder),
+                            "auto_sync_enabled": True},
+                    state_base=state, backup_base=base / "backups")
+                self.assertEqual(result["state"], "busy")
+                inventories.assert_not_called()
 
     def test_two_accounts_can_transfer_independently(self):
         with tempfile.TemporaryDirectory() as root:
