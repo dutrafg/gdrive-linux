@@ -1,6 +1,10 @@
 """Unit tests for mount safety; no FUSE device or account needed."""
 import tempfile
 import unittest
+import io
+import sys
+from contextlib import redirect_stderr
+from unittest.mock import patch
 from pathlib import Path
 
 from mount_drive import command, mount_path, validate_mount
@@ -47,6 +51,21 @@ class MountTests(unittest.TestCase):
             mount_path("../escape")
         with self.assertRaises(ValueError):
             mount_path("bad remote")
+
+    def test_missing_remote_aborts_before_creating_mount_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = {"account": "missing", "folder": str(Path(tmp) / "mirror")}
+            with (patch("mount_drive.load_settings", return_value=settings),
+                  patch("rclone_backend.list_remotes", return_value=[]),
+                  patch("mount_drive.command") as create_command,
+                  patch.object(sys, "argv", ["mount_drive.py", "--serve"]),
+                  redirect_stderr(io.StringIO()) as errors):
+                with self.assertRaises(SystemExit) as raised:
+                    from mount_drive import main
+                    main()
+                self.assertEqual(raised.exception.code, 1)
+                self.assertIn("Conta ausente", errors.getvalue())
+                create_command.assert_not_called()
 
     def test_no_unexpected_directories_without_activation(self):
         with tempfile.TemporaryDirectory() as tmp:
