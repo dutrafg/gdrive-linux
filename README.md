@@ -74,3 +74,9 @@ O botão **Simular** consulta inventários sem transferir dados. **Atualização
 O timer não precisa da janela GTK aberta; não é necessário entrar no aplicativo a cada arquivo salvo. Ele **não** executa sem a sessão de usuário ativa, nem faz sincronização instantânea com eventos de filesystem: a latência normal é aproximadamente de um minuto, além do tempo de transferência. Backups locais ficam em `~/.local/share/gdrive-linux/backups`; versões remotas ficam na pasta reservada `.gdrive-linux-history` da conta escolhida, excluída do inventário do app. As preferências e o histórico de comparação local ficam em arquivos privados na pasta do usuário.
 
 **Se o timer falhar ao ativar**, confira a disponibilidade do systemd do usuário. Sem rclone configurado e internet ativa, não haverá transferência. Caso a pasta local desapareça, o serviço falha sem excluir arquivos remotos. Arquivos nativos Google Docs sem hash comparável podem exigir tratamento manual.
+
+## Comparativo com o Google Drive para Windows
+
+Confira [PARIDADE_WINDOWS.md](PARIDADE_WINDOWS.md) para a matriz de recursos presentes, parciais e ainda não implementados. O aplicativo oferece uma experiência Linux GTK4 própria; não copia marca, recursos proprietários nem código do Google.
+
+Novos problemas da sincronização contínua, como erros e conflitos, podem gerar notificações do desktop quando `notify-send` estiver disponível. Arquivos criados na pasta local com a interface fechada são transferidos no próximo ciclo do serviço, desde que ele tenha sido ativado, o usuário esteja conectado e o rclone tenha acesso à rede.
