@@ -21,6 +21,26 @@ class MountTests(unittest.TestCase):
             self.assertIn("--vfs-cache-mode", cmd)
             self.assertIn("writes", cmd)
 
+    def test_cache_directory_is_explicit_for_user_systemd(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = {"account": "personal", "folder": str(Path(tmp) / "mirror")}
+            args = command(config, root=Path(tmp) / "DriveOnline")
+            self.assertIn("--cache-dir", args)
+            cache = args[args.index("--cache-dir") + 1]
+            self.assertTrue(Path(cache).is_absolute())
+            self.assertIn("gdrive-linux", cache)
+
+    def test_custom_config_is_explicit_on_mount_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "custom-rclone.conf"
+            cfg.write_text("[custom]\ntype = alias\nremote = /tmp\n", encoding="utf-8")
+            with patch.dict("os.environ", {"RCLONE_CONFIG": str(cfg)}):
+                args = command({"account": "personal",
+                                "folder": str(Path(tmp) / "mirror")},
+                               root=Path(tmp) / "DriveOnline")
+            self.assertIn("--config", args)
+            self.assertEqual(args[args.index("--config") + 1], str(cfg))
+
     def test_write_mode_explicit(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = {"account": "personal", "folder": str(Path(tmp)/"mirror"),
