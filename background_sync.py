@@ -8,6 +8,7 @@ import fcntl
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import uuid
@@ -194,6 +195,27 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
         save_private_json(state_base / "latest.json", status)
         return status
 
+def notify_if_changed(previous, current):
+    """Desktop notification only when a new error/conflict condition appears."""
+    state = current.get("state")
+    if state not in ("conflicts", "error"):
+        return False
+    if previous.get("state") == state and (
+        state == "error" or previous.get("conflicts") == current.get("conflicts")):
+        return False
+    if not shutil.which("notify-send"):
+        return False
+    message = ("Conflitos pendentes; verifique o Drive para Linux."
+               if state == "conflicts" else
+               "Falha de sincronização. Verifique a conta e a pasta local.")
+    try:
+        subprocess.run(["notify-send", "--app-name=Drive para Linux",
+                        "Drive para Linux", message], timeout=5,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return True
+
 def main():
     parser = argparse.ArgumentParser(description="Sincronização segura do Drive para Linux")
     parser.add_argument("--once", action="store_true", help="Executar uma verificação")
@@ -201,14 +223,18 @@ def main():
     args = parser.parse_args()
     if not args.once and not args.dry_run:
         parser.error("Use --once ou --dry-run")
+    previous = read_json(STATE_BASE / "latest.json")
     try:
         status = run_once(dry_run=args.dry_run)
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
         status = {"state": "error", "message": str(exc),
                   "time": datetime.now(timezone.utc).isoformat()}
         save_private_json(STATE_BASE / "latest.json", status)
+        notify_if_changed(previous, status)
         print("Drive para Linux: verificação interrompida.", file=sys.stderr)
         return 1
+    if not args.dry_run:
+        notify_if_changed(previous, status)
     print(json.dumps(status, ensure_ascii=False))
     return 0
 
