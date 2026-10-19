@@ -9,7 +9,7 @@ from gi.repository import Gtk, GLib
 from rclone_backend import list_remotes, copy_command, list_files
 from settings import load_settings, save_settings
 
-VERSION = "0.4.2"
+VERSION = "0.5.0"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -26,6 +26,14 @@ class DriveWindow(Gtk.ApplicationWindow):
         root.set_margin_start(20)
         root.set_margin_end(20)
         self.set_child(root)
+        self.pages = Gtk.Stack()
+        self.pages.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
+        nav = Gtk.Box(spacing=8)
+        root.append(nav)
+        for title, name in (("Arquivos", "files"), ("Atividades", "activity"), ("Contas", "accounts")):
+            button = Gtk.Button(label=title)
+            button.connect("clicked", lambda _button, page=name: self.pages.set_visible_child_name(page))
+            nav.append(button)
 
         heading = Gtk.Label(label="Drive para Linux")
         heading.set_xalign(0)
@@ -36,7 +44,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         root.append(subtitle)
 
         row = Gtk.Box(spacing=8)
-        root.append(row)
+        accounts_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        accounts_page.append(row)
         row.append(Gtk.Label(label="Conta"))
         self.remotes = Gtk.StringList.new([])
         self.dropdown = Gtk.DropDown(model=self.remotes)
@@ -50,7 +59,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         row.append(config)
 
         folderrow = Gtk.Box(spacing=8)
-        root.append(folderrow)
+        accounts_page.append(folderrow)
         folderrow.append(Gtk.Label(label="Pasta local"))
         self.folder = Path(self.preferences.get("folder", str(Path.home() / "GoogleDrive"))).expanduser()
         self.folder_label = Gtk.Label(label=str(self.folder))
@@ -63,7 +72,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         folderrow.append(choose)
 
         actions = Gtk.Box(spacing=8)
-        root.append(actions)
+        accounts_page.append(actions)
         self.download = Gtk.Button(label="Baixar da nuvem")
         self.download.connect("clicked", self.transfer, "download")
         actions.append(self.download)
@@ -81,14 +90,15 @@ class DriveWindow(Gtk.ApplicationWindow):
         root.append(self.status)
         scroll = Gtk.ScrolledWindow()
         scroll.set_vexpand(True)
-        root.append(scroll)
+        activity_page.append(scroll)
         self.log = Gtk.TextView()
         self.log.set_editable(False)
         self.log.set_monospace(True)
         scroll.set_child(self.log)
         self.path_parts = []
         browser_header = Gtk.Box(spacing=8)
-        root.append(browser_header)
+        files_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        files_page.append(browser_header)
         self.back_button = Gtk.Button(label="Voltar")
         self.back_button.connect("clicked", self.go_back)
         browser_header.append(self.back_button)
@@ -105,16 +115,23 @@ class DriveWindow(Gtk.ApplicationWindow):
         file_scroll.set_min_content_height(140)
         file_scroll.set_child(self.files_list)
         file_scroll.set_vexpand(True)
-        root.append(file_scroll)
+        files_page.append(file_scroll)
         log_label = Gtk.Label(label="Atividade e transferências")
         log_label.set_xalign(0)
-        root.append(log_label)
+        activity_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        activity_page.append(log_label)
         scroll.set_min_content_height(110)
         root.append(scroll)
         self.progress = Gtk.ProgressBar()
         self.progress.set_show_text(True)
         self.progress.set_text("Aguardando transferência")
-        root.append(self.progress)
+        activity_page.append(self.progress)
+        self.pages.add_titled(files_page, "files", "Arquivos")
+        self.pages.add_titled(activity_page, "activity", "Atividades")
+        self.pages.add_titled(accounts_page, "accounts", "Contas")
+        root.append(self.pages)
+        self.pages.set_vexpand(True)
+        self.pages.set_visible_child_name("files")
         self.browse_generation = 0
         self.dropdown.connect("notify::selected", self.account_changed)
         self.refresh()
@@ -266,6 +283,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.status.set_text("Transferência em andamento…")
         self.progress.set_fraction(0)
         self.progress.set_text("Transferindo…")
+        self.pages.set_visible_child_name("activity")
         self.progress.pulse()
         self.progress_timer = GLib.timeout_add(250, self.pulse_progress)
         threading.Thread(target=self.worker, args=(command,), daemon=True).start()
