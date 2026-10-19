@@ -66,41 +66,10 @@ jobs:
           name: gtk4-smoke-diagnostics
           path: /tmp/gdrive-smoke.log
           if-no-files-found: ignore
-      - name: Package
+      - name: Package with reproducible local script
         run: |
-          mkdir -p pkg/DEBIAN pkg/usr/bin pkg/usr/share/gdrive-linux pkg/usr/share/applications
-          cp gdrive-linux pkg/usr/share/gdrive-linux/gdrive-linux
-          cp rclone_backend.py pkg/usr/share/gdrive-linux/rclone_backend.py
-          cp settings.py pkg/usr/share/gdrive-linux/settings.py
-          cp progress.py pkg/usr/share/gdrive-linux/progress.py
-          cp google_oauth.py pkg/usr/share/gdrive-linux/google_oauth.py
-          cp sync_plan.py pkg/usr/share/gdrive-linux/sync_plan.py
-          cp safe_sync.py pkg/usr/share/gdrive-linux/safe_sync.py
-          cp style.css pkg/usr/share/gdrive-linux/style.css
-          cp ui_kit.py pkg/usr/share/gdrive-linux/ui_kit.py
-          printf '#!/bin/sh\nexec /usr/bin/python3 /usr/share/gdrive-linux/gdrive-linux "$@"\n' > pkg/usr/bin/gdrive-linux
-          chmod 755 pkg/usr/bin/gdrive-linux
-          cat > pkg/DEBIAN/control <<'EOF'
-          Package: gdrive-linux
-          Version: 0.11.1
-          Section: utils
-          Priority: optional
-          Architecture: all
-          Depends: python3 (>= 3.9), python3-gi, gir1.2-gtk-4.0
-          Recommends: rclone
-          Maintainer: Drive para Linux <noreply@example.invalid>
-          Description: Cliente grafico GTK4 para Google Drive usando rclone
-          EOF
-          cat > pkg/usr/share/applications/gdrive-linux.desktop <<'EOF'
-          [Desktop Entry]
-          Type=Application
-          Name=Drive para Linux
-          Exec=gdrive-linux
-          Icon=folder-remote
-          Categories=Network;FileTransfer;
-          Terminal=false
-          EOF
-          dpkg-deb --build pkg gdrive-linux_0.11.1_all.deb
+          bash -n build-deb.sh
+          bash build-deb.sh
       - name: Validate Debian package metadata and contents
         run: |
           set -eu
