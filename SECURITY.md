@@ -1,6 +1,6 @@
 # Política de segurança — Drive para Linux
 
-**Estado:** 0.8.0 Alpha, software experimental. Não há auditoria de segurança independente nem garantia de uso em produção.
+**Estado:** 0.9.3 Alpha, software experimental. Não há auditoria de segurança independente nem garantia de uso em produção.
 
 ## Reportar vulnerabilidades
 
@@ -32,7 +32,7 @@ Informe versão, distribuição Linux, passos de reprodução, impacto e registr
 
 ## Segurança do desenvolvimento
 
-- O GitHub Actions executa testes unitários, verificação sintática, teste básico de abertura GTK4 sob Xvfb e gera pacote `.deb`.
+- O GitHub Actions executa testes unitários, verificação sintática, teste de abertura GTK4 em Wayland com Weston e testes de cópia local real com rclone e gera pacote `.deb`.
 - Esses testes **não** constituem auditoria de segurança, teste de autorização OAuth real ou validação de todas as distribuições.
 - Não adicionar segredos, `rclone.conf`, tokens ou chaves privadas ao repositório.
 - Dependências principais: Python, PyGObject/GTK4 e rclone. Atualize-as pelos repositórios confiáveis da distribuição.
