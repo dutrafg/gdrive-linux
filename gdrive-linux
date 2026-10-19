@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 """Drive para Linux — GTK4 frontend for rclone."""
+import os
 import subprocess
 import threading
 import time
