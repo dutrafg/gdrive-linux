@@ -72,3 +72,21 @@ O GitHub Actions testa os comandos FUSE e do Google Photos sem credenciais reais
 - [ ] Com exclusões automáticas desativadas, exclusão local/remota não modifica a outra cópia.
 - [ ] Após opt-in de exclusões recuperáveis, excluir de um lado e conferir arquivo no histórico remoto/local, sem exclusões definitivas.
 - [ ] Revisar rclone/Google reais no Zorin; os testes CI com backend local não garantem sucesso com cota compartilhada.
+
+## QA de prioridade alta/média — v0.14.0
+
+- [ ] Validar `test_sync_profiles` em backend rclone alias com duas contas separadas, somente envio/download, filtros, pastas externas simuladas e preservação de arquivos excluídos da seleção.
+- [ ] Testar `test_desktop_integrations` para favoritos GTK, exportação Office/ODF/PDF, atalho de bandeja e timer do usuário.
+- [ ] Confirmar `systemd-analyze verify`, instalação das novas dependências de recomendação e todas as bibliotecas Python no `.deb`.
+- [ ] Confirmar execução de `gdrive-linux --ui-smoke` no Weston/Wayland e carregamento CSS GTK4 sem erros.
+- [ ] Zorin real: ativar **Montar automaticamente**, sair e entrar na sessão; verificar montagem sem abrir a GUI.
+- [ ] Zorin real: copiar um documento de teste, escolher pasta, ignorar extensão `*.tmp`, confirmar que a exclusão da seleção não apaga arquivos.
+- [ ] Zorin real: criar dois perfis para diferentes contas e pastas, inclusive um volume USB; testar desligar o disco sem modificar o remoto.
+- [ ] Zorin real: selecionar somente envio e somente download e demonstrar que a direção oposta não executa gravação.
+- [ ] Zorin real: favoritar `~/DriveOnline/<conta>` no Zorin Files, verificar e remover sem alterar outros favoritos.
+- [ ] Zorin real: instalar dependências opcionais da bandeja, habilitar indicador, conferir status e reinício na sessão seguinte.
+- [ ] Zorin real: exportar Google Docs/Sheets/Slides em ODF, Office e PDF, verificar arquivos originais intactos e limites de quota API.
+- [ ] Zorin real: abrir arquivos do Drive com LibreOffice/OnlyOffice e conferir persistência das edições após sincronização, sem conflitos.
+- [ ] Verificar que nenhum recurso adicional ativa exclusões definitivas por padrão e que backups permanecem restauráveis.
+
+**Os testes automatizados com remotos locais não equivalem à homologação com conta Google e Zorin OS físicos.**
