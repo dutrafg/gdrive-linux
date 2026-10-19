@@ -10,7 +10,7 @@ from rclone_backend import list_remotes, copy_command, list_files
 from settings import load_settings, save_settings
 from progress import parse_progress
 
-VERSION = "0.6.0"
+VERSION = "0.7.0"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -122,6 +122,9 @@ class DriveWindow(Gtk.ApplicationWindow):
         log_label.set_xalign(0)
         activity_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         activity_page.append(log_label)
+        self.history = Gtk.Label(label="Nenhuma transferência nesta sessão.")
+        self.history.set_xalign(0)
+        activity_page.append(self.history)
         scroll.set_min_content_height(110)
         activity_page.append(scroll)
         self.progress = Gtk.ProgressBar()
@@ -279,6 +282,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.status.set_text(str(exc))
             return
         self.busy = True
+        self.history.set_text("Transferência iniciada")
         self.proc = None
         self.cancel_requested = False
         self.download.set_sensitive(False)
@@ -339,6 +343,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         return False
 
     def finish(self):
+        self.history.set_text(self.status.get_text())
         self.busy = False
         self.progress.set_fraction(0)
         self.progress.set_text("Transferência finalizada")
