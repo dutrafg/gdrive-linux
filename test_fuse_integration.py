@@ -37,6 +37,8 @@ class LocalFuseMountIntegration(unittest.TestCase):
     def _start_mount(self, root, writable):
         remote = root / "source"
         remote.mkdir()
+        if not writable:
+            (remote / "probe.txt").write_text("fuse-read-ok", encoding="utf-8")
         mount_root = root / "virtual"
         config_file = root / "rclone.conf"
         config_file.write_text(
@@ -85,15 +87,8 @@ class LocalFuseMountIntegration(unittest.TestCase):
     def test_local_alias_read_only_mount_and_unmount(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            (root / "source").mkdir()
-            (root / "source" / "probe.txt").write_text("fuse-read-ok")
-            (root / "source").rmdir() if False else None
-            # _start_mount prepares the source; avoid conflicting setup.
-            (root / "source" / "probe.txt").unlink()
-            (root / "source").rmdir()
             process, remote, mount = self._start_mount(root, writable=False)
             try:
-                (remote / "probe.txt").write_text("fuse-read-ok")
                 self.assertTrue(await_condition(
                     lambda: (mount / "probe.txt").exists(), seconds=10))
                 self.assertEqual((mount / "probe.txt").read_text(),
