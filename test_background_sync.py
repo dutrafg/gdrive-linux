@@ -1,0 +1,147 @@
+"""QA for continuous, conflict-safe Google Drive mirroring (no Google account required)."""
+import os
+import shutil
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from background_sync import (
+    build_plan, refresh_baseline, run_once, save_private_json, read_json,
+)
+
+MD5_A = ("md5", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+MD5_B = ("md5", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+MD5_C = ("md5", "cccccccccccccccccccccccccccccccc")
+
+class SafePlanTests(unittest.TestCase):
+    def test_new_files_both_directions(self):
+        work, problems = build_plan({"local.txt": MD5_A}, {"remote.txt": MD5_B}, {})
+        self.assertEqual(work, [("upload_new", "local.txt"), ("download_new", "remote.txt")])
+        self.assertEqual(problems, [])
+
+    def test_local_edit_only_uploads(self):
+        work, problems = build_plan({"doc.txt": MD5_B}, {"doc.txt": MD5_A},
+                                    {"doc.txt": MD5_A[1]})
+        self.assertEqual(work, [("upload_update", "doc.txt")])
+        self.assertEqual(problems, [])
+
+    def test_remote_edit_only_downloads(self):
+        work, problems = build_plan({"doc.txt": MD5_A}, {"doc.txt": MD5_B},
+                                    {"doc.txt": MD5_A[1]})
+        self.assertEqual(work, [("download_update", "doc.txt")])
+        self.assertEqual(problems, [])
+
+    def test_simultaneous_edit_is_conflict(self):
+        work, problems = build_plan({"doc.txt": MD5_B}, {"doc.txt": MD5_C},
+                                    {"doc.txt": MD5_A[1]})
+        self.assertEqual(work, [])
+        self.assertEqual(problems, ["doc.txt"])
+
+    def test_initial_difference_is_conflict(self):
+        work, problems = build_plan({"doc.txt": MD5_B}, {"doc.txt": MD5_C}, {})
+        self.assertEqual(work, [])
+        self.assertEqual(problems, ["doc.txt"])
+
+    def test_deletions_are_not_propagated(self):
+        for local, cloud in (({}, {"doc.txt": MD5_A}),
+                             ({"doc.txt": MD5_A}, {})):
+            work, problems = build_plan(local, cloud, {"doc.txt": MD5_A[1]})
+            self.assertEqual(work, [])
+            self.assertEqual(problems, ["doc.txt"])
+
+    def test_versions_folder_is_never_synced(self):
+        work, problems = build_plan(
+            {".gdrive-linux-history/backup.txt": MD5_A}, {}, {})
+        self.assertEqual(work, [])
+        self.assertEqual(problems, [])
+
+    def test_refresh_baseline_after_both_match(self):
+        self.assertEqual(
+            refresh_baseline({}, {"one.txt": MD5_A}, {"one.txt": MD5_A}),
+            {"one.txt": MD5_A[1]})
+
+    def test_private_file_permissions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state" / "snap.json"
+            save_private_json(path, {"md5": {"doc.txt": MD5_A[1]}})
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(read_json(path)["md5"]["doc.txt"], MD5_A[1])
+
+    def test_disabled_job_does_no_io(self):
+        with patch("background_sync.list_remotes") as remotes:
+            self.assertEqual(run_once(config={"auto_sync_enabled": False})["state"],
+                             "disabled")
+            remotes.assert_not_called()
+
+@unittest.skipUnless(shutil.which("rclone"), "requires local rclone")
+class RcloneMirrorIntegrationTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        root = Path(self.temp.name)
+        self.folder = root / "local"
+        self.cloud = root / "cloud"
+        self.state = root / "state"
+        self.backups = root / "backups"
+        self.folder.mkdir()
+        self.cloud.mkdir()
+        config_path = root / "rclone.conf"
+        config_path.write_text(
+            "[qa_cloud]\ntype = alias\nremote = " + str(self.cloud) + "\n",
+            encoding="utf-8")
+        self.env = patch.dict(os.environ, {"RCLONE_CONFIG": str(config_path)})
+        self.env.start()
+        self.addCleanup(self.env.stop)
+        self.config = {"auto_sync_enabled": True, "account": "qa_cloud",
+                       "folder": str(self.folder)}
+
+    def run_sync(self):
+        return run_once(config=self.config, state_base=self.state,
+                        backup_base=self.backups)
+
+    def test_selected_folder_receives_and_uploads_new_files(self):
+        (self.folder / "saved-locally.txt").write_text("from computer", encoding="utf-8")
+        (self.cloud / "created-remotely.txt").write_text("from cloud", encoding="utf-8")
+        result = self.run_sync()
+        self.assertEqual(result["state"], "ok")
+        self.assertEqual(result["copied"], 2)
+        self.assertEqual((self.cloud / "saved-locally.txt").read_text(), "from computer")
+        self.assertEqual((self.folder / "created-remotely.txt").read_text(), "from cloud")
+
+    def test_edits_propagate_both_ways_with_backups(self):
+        (self.folder / "document.txt").write_text("initial", encoding="utf-8")
+        self.run_sync()
+        (self.folder / "document.txt").write_text("local edit", encoding="utf-8")
+        changed = self.run_sync()
+        self.assertEqual(changed["copied"], 1)
+        self.assertEqual((self.cloud / "document.txt").read_text(), "local edit")
+        (self.cloud / "document.txt").write_text("remote edit", encoding="utf-8")
+        changed = self.run_sync()
+        self.assertEqual(changed["copied"], 1)
+        self.assertEqual((self.folder / "document.txt").read_text(), "remote edit")
+        self.assertTrue(list(self.backups.rglob("document.txt")))
+        self.assertTrue(list((self.cloud / ".gdrive-linux-history").rglob("document.txt")))
+
+    def test_conflicting_edits_remain_untouched(self):
+        (self.folder / "shared.txt").write_text("initial", encoding="utf-8")
+        self.run_sync()
+        (self.folder / "shared.txt").write_text("local edit", encoding="utf-8")
+        (self.cloud / "shared.txt").write_text("cloud edit", encoding="utf-8")
+        result = self.run_sync()
+        self.assertEqual(result["state"], "conflicts")
+        self.assertEqual(result["copied"], 0)
+        self.assertEqual((self.folder / "shared.txt").read_text(), "local edit")
+        self.assertEqual((self.cloud / "shared.txt").read_text(), "cloud edit")
+
+    def test_deleted_cloud_file_is_not_removed_locally(self):
+        (self.folder / "keep.txt").write_text("safe", encoding="utf-8")
+        self.run_sync()
+        (self.cloud / "keep.txt").unlink()
+        result = self.run_sync()
+        self.assertEqual(result["conflicts"], 1)
+        self.assertTrue((self.folder / "keep.txt").exists())
+        self.assertFalse((self.cloud / "keep.txt").exists())
+
+if __name__ == "__main__":
+    unittest.main()
