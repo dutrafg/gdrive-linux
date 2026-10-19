@@ -3,6 +3,8 @@ from ui_kit import format_size
 from pathlib import Path
 from gi.repository import Gtk
 
+Gtk.init()
+
 class FormatSizeTests(unittest.TestCase):
     def test_bytes(self):
         self.assertEqual(format_size(0), "0 B")
