@@ -1,6 +1,6 @@
 # Drive para Linux
 
-Cliente experimental **GTK4** para acessar o Google Drive no Linux usando **rclone**. Versão atual: **0.11.0 Alpha**. Não é um cliente oficial do Google.
+Cliente experimental **GTK4** para acessar o Google Drive no Linux usando **rclone**. Versão atual: **0.11.1 Alpha**. Não é um cliente oficial do Google.
 
 ## Funcionalidades
 
