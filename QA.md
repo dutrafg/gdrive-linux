@@ -128,3 +128,14 @@ O GitHub Actions testa os comandos FUSE e do Google Photos sem credenciais reais
 - [ ] Confirmar visualmente a indicação de sincronização parcial, as mensagens por conta e o aviso de atividade atrasada na sessão Zorin real.
 
 O checklist de código acima representa testes escritos e integrados ao pipeline, não um atestado de execução bem-sucedida da **última** revisão enquanto seu workflow estiver pendente. Não divulgar versão como aprovada antes da execução de CI correspondente.
+
+## QA final da v0.14.4 Alpha
+
+- Verificar preservação do erro de cota/transferência quando o inventário pós-transferência falha.
+- Verificar que um arquivo recém-modificado não pode ser arquivado por revisão manual ou automática de exclusões.
+- Verificar que filtros ignorados não permitem arquivar manualmente arquivos que saíram da seleção.
+- Verificar que arquivos Google sem MD5 não provocam transferências automáticas incompatíveis.
+- Verificar permissões da pasta pai do FUSE e nenhuma criação de pastas quando falha o pré-diagnóstico.
+- Verificar indicador de atividade desatualizada e atualização periódica na GUI sem consultas ao Drive.
+- Validar a inicialização GTK4 no Wayland e o executável **instalado** sob Xvfb/D-Bus.
+- Confirmar os resultados e limitações em [RELEASE_0.14.4.md](RELEASE_0.14.4.md).
