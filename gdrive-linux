@@ -216,9 +216,9 @@ class DriveWindow(Gtk.ApplicationWindow):
             "Atenção: transferências manuais podem substituir arquivos com o mesmo nome.",
             "folder-download-symbolic")
         manual_buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        self.download = action("Baixar da nuvem", lambda *_: self.transfer(None, "download"),
+        self.download = action("Baixar da nuvem", lambda *_: self.confirm_transfer("download"),
                                "go-down-symbolic", primary=True)
-        self.upload = action("Enviar para nuvem", lambda *_: self.transfer(None, "upload"),
+        self.upload = action("Enviar para nuvem", lambda *_: self.confirm_transfer("upload"),
                              "go-up-symbolic")
         manual_buttons.append(self.download)
         manual_buttons.append(self.upload)
@@ -810,6 +810,38 @@ class DriveWindow(Gtk.ApplicationWindow):
         buf = self.log.get_buffer()
         buf.insert(buf.get_end_iter(), line + "\n")
         return False
+
+    def confirm_transfer(self, direction):
+        """Manual copies can overwrite files, so ask before starting."""
+        if self.busy or self.sync_busy:
+            self.notice("Aguarde a transferência atual.", "warning")
+            return
+        if not self.selected_remote() or not self.folder.is_dir():
+            self.notice("Selecione uma conta e pasta local antes de transferir.", "warning")
+            return
+        dialog = Gtk.Window(title="Confirmar transferência", transient_for=self, modal=True)
+        dialog.set_default_size(420, 220)
+        dialog.add_css_class("drive-dialog")
+        panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        panel.set_margin_top(20)
+        panel.set_margin_bottom(20)
+        panel.set_margin_start(22)
+        panel.set_margin_end(22)
+        dialog.set_child(panel)
+        panel.append(section_title(
+            "Confirmar " + ("download" if direction == "download" else "upload"),
+            "A cópia manual pode substituir arquivos no destino, "
+            "mas não remove arquivos que existam somente no destino."))
+        panel.append(label("Conta: " + str(self.selected_remote()) +
+                           "   •   Pasta: " + str(self.folder), "drive-muted", wrap=True))
+        buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        buttons.append(action("Voltar", lambda *_: dialog.close()))
+        def proceed(_button):
+            dialog.close()
+            self.transfer(None, direction)
+        buttons.append(action("Confirmar e iniciar", proceed, primary=True))
+        panel.append(buttons)
+        dialog.present()
 
     def transfer(self, _button, direction, automatic=False):
         if self.busy or self.sync_busy:
