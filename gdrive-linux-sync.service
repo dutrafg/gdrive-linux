@@ -1,0 +1,12 @@
+[Unit]
+Description=Drive para Linux - sincronizacao bidirecional segura
+Documentation=https://github.com/dutrafg/gdrive-linux
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/share/gdrive-linux/background_sync.py --once
+TimeoutStartSec=20min
+Nice=10
+NoNewPrivileges=true
