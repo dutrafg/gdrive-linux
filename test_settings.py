@@ -11,7 +11,14 @@ class SettingsTests(unittest.TestCase):
             directory = Path(temp) / "config"
             with patch.object(settings, "CONFIG_DIR", directory), patch.object(settings, "CONFIG_FILE", directory / "settings.json"):
                 settings.save_settings("/tmp/drive", "conta")
-                self.assertEqual(settings.load_settings(), {"folder": "/tmp/drive", "account": "conta", "auto_sync_enabled": False, "mount_read_only": True, "auto_archive_deletions": False})
+                loaded = settings.load_settings()
+                self.assertEqual(loaded["folder"], "/tmp/drive")
+                self.assertEqual(loaded["account"], "conta")
+                self.assertIs(loaded["auto_sync_enabled"], False)
+                self.assertIs(loaded["mount_read_only"], True)
+                self.assertIs(loaded["auto_archive_deletions"], False)
+                self.assertEqual(loaded["sync_mode"], "bidirectional")
+                self.assertEqual(loaded["sync_profiles"], [])
                 self.assertEqual(os.stat(settings.CONFIG_FILE).st_mode & 0o777, 0o600)
                 self.assertEqual(os.stat(directory).st_mode & 0o777, 0o700)
 
