@@ -10,4 +10,3 @@ ExecStart=/usr/bin/python3 /usr/share/gdrive-linux/mount_drive.py --serve
 TimeoutStartSec=90
 Restart=no
 Nice=5
-NoNewPrivileges=true
