@@ -6,7 +6,7 @@ Streaming/espelhamento: https://support.google.com/drive/answer/13401938?hl=pt-B
 O Drive para Linux é um aplicativo **independente**, GTK4 com rclone, e não
 distribui marca, ícones ou código proprietário do Google.
 
-| Recurso | Drive para computador (Windows) | Drive para Linux 0.12.0 |
+| Recurso | Drive para computador (Windows) | Drive para Linux 0.13.0 |
 | --- | --- | --- |
 | Autorização Google | navegador oficial | assistente GTK4 inicia OAuth pelo rclone no navegador; homologação real pendente |
 | Contas múltiplas | sim | gerencia múltiplos remotes rclone; **um remoto ativo por sincronização automática** |
@@ -15,16 +15,16 @@ distribui marca, ícones ou código proprietário do Google.
 | Novos arquivos remotos | automático | **sim**, na próxima execução do serviço |
 | Editar arquivos existentes | sim | **sim**, se somente um lado mudou em relação ao histórico |
 | Conflitos simultâneos | gestão por Drive | preservados e notificados no estado para revisão manual |
-| Exclusões e renomeações | propagadas | **não propagadas automaticamente por segurança** |
+| Exclusões e renomeações | propagadas | **revisão manual com arquivamento recuperável; não propagadas automaticamente** |
 | Pasta local selecionada | sim | sim |
 | Trabalhar offline | arquivos espelhados disponíveis | arquivos já presentes na pasta local disponíveis, sincroniza após reconexão |
 | Pesquisa de arquivos | sim | pesquisa read-only por nome/caminho no remoto selecionado |
-| Streaming como disco virtual | sim | **não implementado**; demanda FUSE e tratamento de cache |
+| Streaming como disco virtual | sim | **implementado de forma opcional** com rclone mount/FUSE, pasta separada e somente leitura por padrão; teste real Zorin ainda pendente |
 | Ícone na bandeja do sistema | sim | **não implementado**; timer pode trabalhar sem GUI aberta |
 | Pausar/retomar | sim | switch de ativação do systemd timer do usuário |
 | Última operação | sim | estado do ciclo automático e histórico da sessão GUI |
-| Backup para Google Photos | sim | **não implementado** |
-| Integração Microsoft Office/Outlook | nativa no Windows | não disponível via rclone |
+| Backup para Google Photos | sim | **implementação parcial** |
+| Integração Microsoft Office/Outlook | nativa no Windows | abre arquivos espelhados/streaming no aplicativo padrão Linux; não oferece presença Office/Outlook |
 | Unidades compartilhadas | sim | somente remotes configurados adequadamente no rclone |
 | Sincronização após logout do Linux | serviço próprio | **não**; requer sessão do usuário ativa (sem linger habilitado) |
 
