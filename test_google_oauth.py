@@ -9,13 +9,18 @@ class GoogleOAuthTests(unittest.TestCase):
         self.assertIn("true", cmd)
         self.assertNotIn("client_secret", cmd)
 
+    def test_default_client_requires_no_google_cloud_setup(self):
+        cmd = google_config_command("pessoal")
+        self.assertNotIn("client_id", cmd)
+        self.assertEqual(cmd[:5], ["rclone", "config", "create", "pessoal", "drive"])
+
     def test_invalid_names(self):
         for name in ("", "../evil", "a:b", "a b", "x\n"):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 google_config_command(name, "123.apps.googleusercontent.com")
 
     def test_invalid_client_id(self):
-        for client in ("", "not-google", "--help", "a\n.apps.googleusercontent.com"):
+        for client in ("not-google", "--help", "a\n.apps.googleusercontent.com"):
             with self.subTest(client=client), self.assertRaises(ValueError):
                 google_config_command("drive", client)
 
