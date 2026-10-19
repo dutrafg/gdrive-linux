@@ -1,0 +1,24 @@
+/* GTK4 theme for Drive para Linux. No external assets or network required. */
+window.drive-window { background: #f0f5fb; color: #183251; }
+.drive-sidebar { background: #192b41; padding: 22px 14px; min-width: 192px; }
+.drive-sidebar label { color: #d6e2f1; }
+.drive-sidebar button { color: #d6e2f1; background: transparent; border: 0; padding: 13px 16px; border-radius: 10px; }
+.drive-sidebar button:hover { background: #2d4562; }
+.drive-sidebar button.suggested-action { background: #1271ed; color: white; }
+.drive-content { background: #f0f5fb; padding: 24px; }
+.drive-header { padding: 5px 0 18px 0; }
+.drive-header .title-1 { color: #142c49; font-weight: 800; }
+.drive-card { background: #ffffff; border: 1px solid #dce5ef; border-radius: 14px; padding: 17px; }
+.drive-card label { color: #243f60; }
+.drive-muted { color: #60748d; }
+.drive-connect { background: #126ded; color: white; border-radius: 9px; font-weight: bold; padding: 12px 18px; }
+.drive-connect:hover { background: #075bd0; }
+.drive-content button { border-radius: 9px; }
+.drive-content entry { border-radius: 9px; min-height: 32px; }
+.drive-content dropdown { border-radius: 9px; min-height: 32px; }
+.drive-banner { color: #214563; background: #e4edf7; border-radius: 9px; padding: 11px; }
+.drive-dialog { background: #ffffff; }
+.drive-wizard-head { padding: 15px; background: #eaf2fb; border-radius: 12px; }
+.drive-step { background: #edf2f8; border-radius: 24px; padding: 9px 15px; }
+.drive-step-active { background: #1271ed; color: white; border-radius: 24px; padding: 9px 15px; }
+.drive-status { background: #e5edf7; border-radius: 9px; padding: 12px; color: #183251; }
