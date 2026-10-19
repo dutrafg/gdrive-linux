@@ -11,7 +11,7 @@ class SettingsTests(unittest.TestCase):
             directory = Path(temp) / "config"
             with patch.object(settings, "CONFIG_DIR", directory), patch.object(settings, "CONFIG_FILE", directory / "settings.json"):
                 settings.save_settings("/tmp/drive", "conta")
-                self.assertEqual(settings.load_settings(), {"folder": "/tmp/drive", "account": "conta"})
+                self.assertEqual(settings.load_settings(), {"folder": "/tmp/drive", "account": "conta", "auto_sync_enabled": False})
                 self.assertEqual(os.stat(settings.CONFIG_FILE).st_mode & 0o777, 0o600)
                 self.assertEqual(os.stat(directory).st_mode & 0o777, 0o700)
 
@@ -25,6 +25,16 @@ class SettingsTests(unittest.TestCase):
                 restored = settings.load_settings()
                 self.assertEqual(restored["account_names"]["pessoal"], "Uso pessoal")
                 self.assertEqual(restored["account_names"]["trabalho"], "Trabalho")
+                self.assertEqual(os.stat(settings.CONFIG_FILE).st_mode & 0o777, 0o600)
+
+    def test_persistent_background_sync_opt_in(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp) / "config"
+            with patch.object(settings, "CONFIG_DIR", directory), patch.object(
+                    settings, "CONFIG_FILE", directory / "settings.json"):
+                settings.save_settings("/tmp/folder", "cloud",
+                                       auto_sync_enabled=True)
+                self.assertIs(settings.load_settings()["auto_sync_enabled"], True)
                 self.assertEqual(os.stat(settings.CONFIG_FILE).st_mode & 0o777, 0o600)
 
     def test_corrupt_settings(self):
