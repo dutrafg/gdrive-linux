@@ -15,6 +15,18 @@ class BackendTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             self.assertEqual(b.copy_command('drive', folder, 'download')[:3], ['rclone', 'copy', 'drive:'])
     @patch('rclone_backend.subprocess.run')
+    def test_search_files_filters_paths(self, run):
+        run.return_value.stdout = ('[{"Path":"Documents/Estudo.pdf","Size":100},'
+                                   '{"Path":"Fotos/photo.jpg","Size":200}]')
+        found = b.search_files("drive", "ESTUDO")
+        self.assertEqual(found[0]["name"], "Documents/Estudo.pdf")
+        self.assertEqual(len(found), 1)
+
+    def test_search_minimum_length(self):
+        with self.assertRaises(ValueError):
+            b.search_files("drive", "a")
+
+    @patch('rclone_backend.subprocess.run')
     def test_lsjson(self, run):
         run.return_value.stdout = '[{"Name":"Fotos","IsDir":true,"Size":0},{"Name":"a.txt","IsDir":false,"Size":10}]'
         self.assertEqual(b.list_files('drive')[0]['name'], 'Fotos')
