@@ -86,11 +86,8 @@ button:disabled { opacity: 0.47; }
 .drive-content button:focus-visible,
 .drive-dialog button:focus-visible {
   outline: 2px solid #4aa3ff;
-  outline-offset: 2px;
 }
-.drive-sidebar button.drive-nav { transition: background 130ms ease; }
 .drive-card { margin-bottom: 2px; }
-.drive-data-line label { letter-spacing: 0.3px; }
 .drive-file-list row:selected { background: #dfedff; color: #163c65; }
 .drive-file-list row:selected label { color: #163c65; }
 .drive-history row:selected { background: #e9f3ff; }
