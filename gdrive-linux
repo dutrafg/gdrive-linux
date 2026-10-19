@@ -9,7 +9,7 @@ from gi.repository import Gtk, GLib
 from rclone_backend import list_remotes, copy_command, list_files
 from settings import load_settings, save_settings
 
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -90,7 +90,6 @@ class DriveWindow(Gtk.ApplicationWindow):
         root.append(self.status)
         scroll = Gtk.ScrolledWindow()
         scroll.set_vexpand(True)
-        activity_page.append(scroll)
         self.log = Gtk.TextView()
         self.log.set_editable(False)
         self.log.set_monospace(True)
@@ -101,6 +100,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         files_page.append(browser_header)
         self.back_button = Gtk.Button(label="Voltar")
         self.back_button.connect("clicked", self.go_back)
+        self.back_button.set_sensitive(False)
         browser_header.append(self.back_button)
         self.path_label = Gtk.Label(label="Meu Drive")
         self.path_label.set_hexpand(True)
@@ -121,7 +121,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         activity_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         activity_page.append(log_label)
         scroll.set_min_content_height(110)
-        root.append(scroll)
+        activity_page.append(scroll)
         self.progress = Gtk.ProgressBar()
         self.progress.set_show_text(True)
         self.progress.set_text("Aguardando transferência")
@@ -156,6 +156,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.path_parts = []
         self.browse_generation += 1
         self.path_label.set_text("Meu Drive")
+        self.back_button.set_sensitive(False)
         while row := self.files_list.get_row_at_index(0):
             self.files_list.remove(row)
 
@@ -173,7 +174,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.browse_generation += 1
         generation = self.browse_generation
         self.status.set_text("Carregando arquivos…")
-        self.path_label.set_text("Meu Drive / " + " / ".join(self.path_parts))
+        self.path_label.set_text("Meu Drive" + ((" / " + " / ".join(self.path_parts)) if self.path_parts else ""))
+        self.back_button.set_sensitive(bool(self.path_parts))
         threading.Thread(target=self.browse_worker, args=(remote, "/".join(self.path_parts), generation), daemon=True).start()
 
     def browse_worker(self, remote, relative, generation):
