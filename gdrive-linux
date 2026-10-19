@@ -1041,7 +1041,7 @@ class DriveWindow(Gtk.ApplicationWindow):
             return
         self.mount_busy = True
         self.persist()
-        self.mount_status.set_text("Preparando FUSE e aguardando confirmação do rclone. Isso pode levar até 2 minutos…")
+        self.mount_status.set_text("Preparando FUSE e aguardando confirmação do rclone. Isso pode levar até 3 minutos…")
         threading.Thread(target=self.mount_action_worker, args=("start", remote),
                          daemon=True).start()
 
@@ -1093,6 +1093,12 @@ class DriveWindow(Gtk.ApplicationWindow):
             if reload.returncode:
                 raise RuntimeError("systemd do usuário não conseguiu carregar o serviço.")
             selected = command
+            # A failed auto-restart can leave a stale systemd state. Clear only
+            # that failure flag; never remove a mount or its write cache.
+            if command in ("start", "restart") and service_state() == "failed":
+                subprocess.run(
+                    ["systemctl", "--user", "reset-failed", service],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=8)
             if command == "start" and remote:
                 path = mount_path(remote)
                 if mount_ready(path):
@@ -1105,7 +1111,7 @@ class DriveWindow(Gtk.ApplicationWindow):
                 response = subprocess.run(
                     ["systemctl", "--user", selected, service],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                    timeout=140)
+                    timeout=205)
                 if command == "stop":
                     success = response.returncode == 0 and (
                         not remote or not mount_ready(mount_path(remote)))
@@ -1130,6 +1136,7 @@ class DriveWindow(Gtk.ApplicationWindow):
 
     def mount_action_complete(self, success, message):
         self.mount_busy = False
+        self.mount_status.set_text(message)
         self.notice(message, "success" if success else "error")
         if not success:
             self.mount_preflight_text.set_text("Montagem recusada. Verificando requisitos locais…")
