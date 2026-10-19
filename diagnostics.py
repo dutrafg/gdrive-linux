@@ -23,6 +23,21 @@ def collect_diagnostics(config=None):
     def add(name, passed, detail):
         items.append({"name": name, "ok": bool(passed), "detail": detail})
 
+    # OAuth credentials remain in rclone.conf; validate only the configured
+    # file's existence and private permissions, never read/print its tokens.
+    config_path = config.get("rclone_config_file")
+    if config_path:
+        candidate = Path(config_path).expanduser()
+        available = candidate.is_file()
+        add("Arquivo de configuração rclone", available,
+            "Configuração personalizada disponível aos serviços." if available else
+            "O rclone.conf escolhido não existe mais. Corrija em Configurações.")
+        if available:
+            private = candidate.stat().st_mode & 0o077 == 0
+            add("Proteção do arquivo OAuth", private,
+                "Permissões restritas ao usuário." if private else
+                "O rclone.conf pode ser lido por outros usuários; restrinja "
+                "as permissões desse arquivo sem alterar sua pasta pessoal inteira.")
     exists = shutil.which("rclone") is not None
     add("rclone", exists, "Instalado" if exists else
         "Não encontrado. Instale seguindo https://rclone.org/install/")
