@@ -87,15 +87,14 @@ def row(*items):
     return container
 
 def button_flow(*buttons):
-    """Wrap action buttons instead of clipping them in narrow GTK4 cards."""
-    flow = Gtk.FlowBox()
-    flow.set_selection_mode(Gtk.SelectionMode.NONE)
-    flow.set_min_children_per_line(1)
-    flow.set_max_children_per_line(3)
-    flow.set_column_spacing(8)
-    flow.set_row_spacing(8)
-    flow.set_homogeneous(False)
-    flow.set_halign(Gtk.Align.START)
+    """Vertical GTK4 action group. Its natural height includes every button.
+
+    Nested FlowBoxes sometimes report an insufficient height inside a FlowBox
+    card; use a simple Box so later cards cannot cover the last action.
+    """
+    group = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+    group.add_css_class("drive-button-group")
     for button in buttons:
-        flow.insert(button, -1)
-    return flow
+        button.set_halign(Gtk.Align.FILL)
+        group.append(button)
+    return group
