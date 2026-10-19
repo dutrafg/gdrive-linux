@@ -34,13 +34,14 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.refresh_generation = 0
         self.browse_generation = 0
         self.preview_generation = 0
-        self.auto_enabled = self.preferences.get("auto_sync_enabled", False) is True
+        self.auto_enabled = False
         self.restoring_auto = False
         self.auto_generation = 0
         self.auto_interval_seconds = 300
         self.current_history = None
         self.path_parts = []
         self.preferences = load_settings()
+        self.auto_enabled = self.preferences.get("auto_sync_enabled", False) is True
         self.account_names = self.preferences.get("account_names", {})
         self.folder = Path(self.preferences.get(
             "folder", str(Path.home() / "GoogleDrive"))).expanduser()
