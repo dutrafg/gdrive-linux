@@ -8,6 +8,23 @@ from pathlib import Path
 ENTRY_NAME = "gdrive-linux-indicator.desktop"
 MANAGED_TAG = "X-DriveLinux-Managed=true"
 
+def indicator_available(runner=None):
+    """Check GTK3 AppIndicator in a separate Python process to avoid GTK4 conflicts."""
+    runner = subprocess.run if runner is None else runner
+    probe = ("import gi\n"
+             "gi.require_version('Gtk', '3.0')\n"
+             "try:\n"
+             " gi.require_version('AyatanaAppIndicator3', '0.1')\n"
+             "except (ValueError, ImportError):\n"
+             " gi.require_version('AppIndicator3', '0.1')\n")
+    try:
+        result = runner(
+            ["/usr/bin/python3", "-c", probe], stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, timeout=8)
+        return result.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
 def user_entry(home=None):
     return (Path(home) if home else Path.home()) / ".config" / "autostart" / ENTRY_NAME
 
