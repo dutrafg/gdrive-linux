@@ -107,7 +107,8 @@ class LocalFuseMountIntegration(unittest.TestCase):
                 new_file = mount / "created-via-fuse.txt"
                 new_file.write_text("first", encoding="utf-8")
                 self.assertTrue(await_condition(
-                    lambda: (remote / "created-via-fuse.txt").exists(),
+                    lambda: ((remote / "created-via-fuse.txt").exists()
+                             and (remote / "created-via-fuse.txt").read_text() == "first"),
                     seconds=40), "FUSE failed to upload a newly created file")
                 self.assertEqual((remote / "created-via-fuse.txt").read_text(), "first")
                 new_file.write_text("second", encoding="utf-8")
