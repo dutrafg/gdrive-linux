@@ -498,7 +498,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         waiting_info.set_wrap(True)
         waiting.append(waiting_info)
         spinner = Gtk.Spinner()
-        spinner.set_spinning(True)
+        spinner.start()
         waiting.append(spinner)
         wizard.add_named(waiting, "waiting")
         finished = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
