@@ -1,6 +1,6 @@
 # Política de segurança — Drive para Linux
 
-**Estado:** 0.9.6 Alpha, software experimental. Não há auditoria de segurança independente nem garantia de uso em produção.
+**Estado:** 0.9.7 Alpha, software experimental. Não há auditoria de segurança independente nem garantia de uso em produção.
 
 ## Reportar vulnerabilidades
 
@@ -11,7 +11,7 @@ Informe versão, distribuição Linux, passos de reprodução, impacto e registr
 ## Autenticação Google
 
 - A configuração de contas é delegada ao **rclone**, via `rclone config`; o aplicativo **não solicita senha Google**.
-- OAuth ocorre pelo fluxo disponibilizado pelo rclone; **não há login OAuth integrado na GUI**.
+- A interface GTK4 inicia o fluxo OAuth do rclone e o navegador padrão realiza a autorização. É necessário fornecer um Client ID OAuth do tipo Desktop; o aplicativo não recebe senha Google nem lê os tokens para exibição. O login ainda depende do navegador externo.
 - O arquivo `rclone.conf` pode conter tokens de acesso/renovação. Restrinja seu acesso, não o adicione ao Git e considere usar a criptografia de configuração do rclone.
 - Nunca compartilhe credenciais em logs, screenshots, relatórios de erro ou pacotes Debian.
 - Para distribuição pública, verificar exigências de tela de consentimento, escopos e políticas do Google. Não alegamos que o aplicativo tenha aprovação ou verificação oficial do Google.
