@@ -912,5 +912,35 @@ class DriveApp(Gtk.Application):
         window = self.props.active_window or DriveWindow(self)
         window.present()
 
+def ui_smoke():
+    """Check GTK4 navigation and widgets without accessing a Google account."""
+    Gtk.init()
+    app = DriveApp()
+    if not app.register(None):
+        raise RuntimeError("GTK4 application registration failed")
+    window = DriveWindow(app)
+    expected = ("home", "accounts", "files", "sync", "activity", "history", "settings")
+    if not window.has_css_class("drive-window"):
+        raise AssertionError("Missing application CSS class")
+    for page in expected:
+        if page not in window.nav_buttons:
+            raise AssertionError("Missing navigation: " + page)
+        window.navigate(page)
+        if window.pages.get_visible_child_name() != page:
+            raise AssertionError("Navigation failed: " + page)
+        if not window.nav_buttons[page].has_css_class("drive-selected"):
+            raise AssertionError("Active sidebar item missing: " + page)
+    if window.folder_label.get_text() != str(window.folder):
+        raise AssertionError("Folder labels out of sync")
+    if window.auto_enabled:
+        raise AssertionError("Automatic download must be opt-in")
+    window.close()
+    print("GTK4 UI OK: navigation, cards, labels and defaults")
+    return 0
+
+
 if __name__ == "__main__":
+    import sys
+    if "--ui-smoke" in sys.argv:
+        raise SystemExit(ui_smoke())
     raise SystemExit(DriveApp().run())
