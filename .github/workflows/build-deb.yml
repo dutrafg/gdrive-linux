@@ -12,22 +12,40 @@ jobs:
         run: |
           python3 -m py_compile gdrive-linux rclone_backend.py settings.py progress.py
           python3 -m unittest -v test_backend test_settings test_progress
-      - name: Install GTK4 smoke-test dependencies
+      - name: Install GTK4 Wayland test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 xvfb xauth dbus-x11 rclone
-      - name: GTK4 startup smoke test
+          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 weston dbus-x11 rclone
+      - name: GTK4 native Wayland startup smoke test
         run: |
+          set -eu
+          export XDG_RUNTIME_DIR="$(mktemp -d)"
+          chmod 700 "$XDG_RUNTIME_DIR"
+          export WAYLAND_DISPLAY=wayland-gdrive-ci
+          export GDK_BACKEND=wayland
+          weston --backend=headless-backend.so --socket="$WAYLAND_DISPLAY" --idle-time=0 --log=/tmp/weston-gdrive.log &
+          weston_pid=$!
+          trap 'kill "$weston_pid" 2>/dev/null || true; rm -rf "$XDG_RUNTIME_DIR"' EXIT
+          for i in $(seq 1 40); do
+            if [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then break; fi
+            sleep 0.25
+          done
+          if [ ! -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
+            cat /tmp/weston-gdrive.log
+            exit 1
+          fi
           set +e
-          timeout 12s xvfb-run -a /usr/bin/python3 gdrive-linux > /tmp/gdrive-smoke.log 2>&1
+          timeout 12s dbus-run-session -- /usr/bin/python3 gdrive-linux > /tmp/gdrive-smoke.log 2>&1
           result=$?
+          set -e
           cat /tmp/gdrive-smoke.log
           if [ "$result" -ne 124 ]; then
-            echo "GTK4 exited unexpectedly with code $result"
+            echo "GTK4 Wayland exited unexpectedly with code $result"
+            cat /tmp/weston-gdrive.log
             exit 1
           fi
           if grep -Eq "Traceback|NameError|TypeError|AttributeError|Gtk-WARNING|Gtk-ERROR" /tmp/gdrive-smoke.log; then
-            echo "GTK4 smoke test detected an error"
+            echo "GTK4 Wayland smoke test detected an error"
             exit 1
           fi
       - name: Upload GTK4 diagnostic log
