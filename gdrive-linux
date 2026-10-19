@@ -22,6 +22,7 @@ from mount_checks import inspect_mount, format_mount_report, test_google_read_ac
 from mount_autostart import autostart_enabled, update_autostart
 from sync_filters import parse_entry, parse_rules
 from sync_profiles import MODES, validate_profiles
+from rclone_config import activate_worker_config, normalize_config_path
 from filemanager_bookmarks import set_bookmark
 from google_docs_export import export_documents, export_folder
 from tray_autostart import set_indicator_autostart, indicator_enabled, indicator_available
@@ -63,6 +64,13 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.current_history = None
         self.path_parts = []
         self.preferences = load_settings()
+        self.rclone_config_file = (self.preferences.get("rclone_config_file") or
+                                   os.environ.get("RCLONE_CONFIG", ""))
+        if self.rclone_config_file:
+            try:
+                activate_worker_config({"rclone_config_file": self.rclone_config_file})
+            except ValueError:
+                pass
         self.auto_enabled = self.preferences.get("auto_sync_enabled", False) is True
         self.account_names = self.preferences.get("account_names", {})
         self.mount_read_only = self.preferences.get("mount_read_only", True) is not False
@@ -548,6 +556,17 @@ class DriveWindow(Gtk.ApplicationWindow):
             "emblem-system-symbolic")
         self.settings_rclone = label("Verificando instalação do rclone…", "drive-muted")
         system.append(self.settings_rclone)
+        self.rclone_config_label = label(
+            "Configuração de conta: " +
+            (self.rclone_config_file if self.rclone_config_file else "padrão do rclone"),
+            "drive-muted", wrap=True)
+        system.append(self.rclone_config_label)
+        system.append(action("Escolher rclone.conf existente",
+                             self.choose_rclone_config,
+                             "document-open-symbolic"))
+        system.append(action("Voltar à configuração padrão",
+                             self.use_default_rclone_config,
+                             "edit-undo-symbolic"))
         system.append(action("Atualizar diagnóstico", self.refresh,
                              "view-refresh-symbolic"))
         system.append(action("Configuração avançada (terminal)", self.configure,
@@ -1391,10 +1410,11 @@ class DriveWindow(Gtk.ApplicationWindow):
                           self.auto_archive_deletions,
                           self.sync_includes, self.sync_excludes,
                           self.sync_mode, self.sync_profiles,
-                          self.profiles_configured)
+                          self.profiles_configured,
+                          self.rclone_config_file)
             self.preferences["account"] = account
             self.preferences["folder"] = str(self.folder)
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
             self.status.set_text("Não foi possível salvar preferências: " + str(exc))
 
     def account_changed(self, *_):
@@ -1663,6 +1683,46 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.notice("Pasta local pronta: " + str(target), "success")
         except OSError as exc:
             self.notice("Não foi possível criar a pasta: " + str(exc), "error")
+
+    def choose_rclone_config(self, *_):
+        if self.auto_enabled or self.mount_busy or self.mount_autostart_on:
+            self.notice("Pause os serviços automáticos antes de alterar rclone.conf.", "warning")
+            return
+        dialog = Gtk.FileChooserNative(
+            title="Selecionar arquivo rclone.conf",
+            transient_for=self, action=Gtk.FileChooserAction.OPEN,
+            accept_label="Usar configuração", cancel_label="Cancelar")
+        def response(d, code):
+            if code == Gtk.ResponseType.ACCEPT:
+                file = d.get_file()
+                try:
+                    if not file or not file.get_path():
+                        raise ValueError("Escolha um arquivo local existente.")
+                    chosen = normalize_config_path(file.get_path())
+                    self.rclone_config_file = chosen
+                    os.environ["RCLONE_CONFIG"] = chosen
+                    self.rclone_config_label.set_text(
+                        "Configuração de conta: " + chosen)
+                    self.persist()
+                    self.refresh()
+                    self.notice("Configuração do rclone selecionada para a interface "
+                                "e para os serviços.", "success")
+                except (ValueError, OSError) as exc:
+                    self.notice("rclone.conf inválido: " + str(exc), "warning")
+            d.destroy()
+        dialog.connect("response", response)
+        dialog.show()
+
+    def use_default_rclone_config(self, *_):
+        if self.auto_enabled or self.mount_busy or self.mount_autostart_on:
+            self.notice("Pause os serviços automáticos antes de alterar rclone.conf.", "warning")
+            return
+        self.rclone_config_file = ""
+        os.environ.pop("RCLONE_CONFIG", None)
+        self.rclone_config_label.set_text("Configuração de conta: padrão do rclone")
+        self.persist()
+        self.refresh()
+        self.notice("Configuração padrão do rclone selecionada.", "success")
 
     def choose_folder(self, *_):
         if self.auto_enabled or self.mount_busy or self.mount_autostart_on:
