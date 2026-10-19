@@ -21,15 +21,18 @@ def load_settings():
                 and len(key) <= 60 and len(value) <= 120
             }
         result["auto_sync_enabled"] = data.get("auto_sync_enabled") is True
+        result["mount_read_only"] = data.get("mount_read_only") is not False
         return result
     except (OSError, ValueError, TypeError):
         return {}
 
-def save_settings(folder, account="", account_names=None, auto_sync_enabled=False):
+def save_settings(folder, account="", account_names=None, auto_sync_enabled=False,
+                  mount_read_only=True):
     CONFIG_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(CONFIG_DIR, 0o700)
     payload_data = {"folder": str(folder), "account": account,
-                    "auto_sync_enabled": auto_sync_enabled is True}
+                    "auto_sync_enabled": auto_sync_enabled is True,
+                    "mount_read_only": mount_read_only is not False}
     if account_names:
         payload_data["account_names"] = {
             k: v for k, v in account_names.items()
