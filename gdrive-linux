@@ -1285,7 +1285,14 @@ class DriveWindow(Gtk.ApplicationWindow):
             return
         previous = self.preferences.get("account", "")
         requested = self.selected_remote()
-        if (self.auto_enabled or self.mount_autostart_on) and previous and requested != previous:
+        mounted_previous = False
+        if previous:
+            try:
+                mounted_previous = mount_ready(mount_path(previous))
+            except (OSError, ValueError):
+                mounted_previous = False
+        if (self.auto_enabled or self.mount_autostart_on or
+                self.mount_busy or mounted_previous) and previous and requested != previous:
             self.restoring_accounts = True
             try:
                 names = [self.remotes.get_string(i) for i in
@@ -1294,8 +1301,8 @@ class DriveWindow(Gtk.ApplicationWindow):
                     self.dropdown.set_selected(names.index(previous))
             finally:
                 self.restoring_accounts = False
-            self.notice("Desative a sincronização contínua e a montagem automática "
-                        "antes de trocar a conta.", "warning")
+            self.notice("Pause a sincronização, desative a montagem automática e "
+                        "desmonte o Drive antes de trocar de conta.", "warning")
             return
         self.persist()
         self.verify_generation += 1
