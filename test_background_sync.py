@@ -42,6 +42,17 @@ class SafePlanTests(unittest.TestCase):
         self.assertEqual(work, [])
         self.assertEqual(problems, ["doc.txt"])
 
+    def test_google_native_document_without_md5_requires_export(self):
+        remote = {"Planilhas/orcamento": ("metadata", "0", "2026-10-19")}
+        actions, conflicts = build_plan({}, remote, {})
+        self.assertEqual(actions, [])
+        self.assertEqual(conflicts, ["Planilhas/orcamento"])
+
+    def test_only_sha256_remote_is_not_assumed_to_match_local_md5(self):
+        actions, conflicts = build_plan({}, {"sensitive.bin": ("sha256", "x"*64)}, {})
+        self.assertEqual(actions, [])
+        self.assertEqual(conflicts, ["sensitive.bin"])
+
     def test_initial_difference_is_conflict(self):
         work, problems = build_plan({"doc.txt": MD5_B}, {"doc.txt": MD5_C}, {})
         self.assertEqual(work, [])
