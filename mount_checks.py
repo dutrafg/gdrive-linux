@@ -67,6 +67,17 @@ def inspect_mount(config, root=MOUNT_ROOT):
         check("Conta disponível ao rclone", False, "Indisponível sem rclone.")
         check("Caminho do rclone para systemd", False, "Indisponível sem rclone.")
 
+    custom_rclone_config = os.environ.get("RCLONE_CONFIG")
+    if custom_rclone_config:
+        standard_config = (Path.home() / ".config" / "rclone" / "rclone.conf").resolve()
+        custom_path = Path(custom_rclone_config).expanduser().resolve()
+        nonstandard = custom_path != standard_config
+        check("Configuração rclone no serviço", not nonstandard,
+              "A conta usa o rclone.conf padrão do usuário." if not nonstandard else
+              "Esta sessão usa RCLONE_CONFIG personalizado. O systemd do usuário "
+              "pode não receber essa variável. Configure a conta no rclone.conf "
+              "padrão ou o ambiente do serviço antes da montagem.")
+
     helper = shutil.which("fusermount3") or shutil.which("fusermount")
     check("Helper FUSE", bool(helper),
           "fusermount instalado." if helper else
