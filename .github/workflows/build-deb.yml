@@ -115,7 +115,8 @@ jobs:
         run: |
           set -eu
           sudo apt-get install -y ./gdrive-linux_0.10.0_all.deb
-          dpkg-query -W gdrive-linux
+          test "$(dpkg-query -W -f='\u0024{Status}' gdrive-linux)" = "install ok installed"
+          test "$(dpkg-query -W -f='\u0024{Version}' gdrive-linux)" = "0.10.0"
           test -x /usr/bin/gdrive-linux
           test -f /usr/share/gdrive-linux/gdrive-linux
           test -f /usr/share/applications/gdrive-linux.desktop
