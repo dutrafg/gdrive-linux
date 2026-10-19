@@ -302,6 +302,53 @@ def notify_if_changed(previous, current):
         return False
     return True
 
+def run_profiles(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
+                 max_files=MAX_FILES, dry_run=False):
+    """Run multiple account+folder pairs independently, preserving errors."""
+    config = load_settings() if config is None else config
+    jobs = effective_profiles(config)
+    if not jobs:
+        return {"state": "disabled", "copied": 0, "pending": 0,
+                "conflicts": 0, "profiles": []}
+    results = []
+    for profile in jobs:
+        if not profile.get("enabled", True):
+            continue
+        try:
+            status = run_once(dict(profile, auto_sync_enabled=True),
+                              state_base, backup_base,
+                              max_files=max_files, dry_run=dry_run)
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+            raw = str(exc) + " " + str(getattr(exc, "stderr", "") or "")
+            quota = is_rate_limit(raw)
+            status = {"state": "quota" if quota else "error",
+                      "message": friendly(raw) if quota else str(exc)[:300],
+                      "copied": 0, "conflicts": 0, "pending": 0,
+                      "account": profile["account"], "folder": profile["folder"],
+                      "time": datetime.now(timezone.utc).isoformat()}
+            if quota:
+                status["retry_after"] = quota_retry_after()
+            key = job_key(profile["account"], Path(profile["folder"]))
+            save_private_json(state_base / (key + "-latest.json"), status)
+        results.append(status)
+    if not results:
+        return {"state": "disabled", "copied": 0, "pending": 0,
+                "conflicts": 0, "profiles": []}
+    states = {x.get("state") for x in results}
+    state = ("quota" if "quota" in states else "error" if "error" in states
+             else "conflicts" if "conflicts" in states else "ok")
+    aggregate = {
+        "state": state, "copied": sum(x.get("copied", 0) for x in results),
+        "pending": sum(x.get("pending", 0) for x in results),
+        "conflicts": sum(x.get("conflicts", 0) for x in results),
+        "archived": sum(x.get("archived", 0) for x in results),
+        "profiles": results,
+        "time": datetime.now(timezone.utc).isoformat(),
+    }
+    if not dry_run:
+        save_private_json(state_base / "latest.json", aggregate)
+    return aggregate
+
 def main():
     parser = argparse.ArgumentParser(description="Sincronização segura do Drive para Linux")
     parser.add_argument("--once", action="store_true", help="Executar uma verificação")
@@ -311,7 +358,7 @@ def main():
         parser.error("Use --once ou --dry-run")
     previous = read_json(STATE_BASE / "latest.json")
     try:
-        status = run_once(dry_run=args.dry_run)
+        status = run_profiles(dry_run=args.dry_run)
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
         raw = str(exc) + " " + str(getattr(exc, "stderr", "") or "")
         quota = is_rate_limit(raw)
