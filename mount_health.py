@@ -84,7 +84,7 @@ def service_journal():
     """Recent log lines are handled privately and never displayed as-is."""
     code, stdout, _ = command_output(
         ["journalctl", "--user", "--unit", SERVICE, "--no-pager",
-         "--lines", "25", "--output", "cat"], timeout=10)
+         "--lines", "25", "--since", "-5min", "--output", "cat"], timeout=10)
     return stdout if code == 0 else ""
 
 def mount_diagnosis(path, state=None, journal=None):
