@@ -29,11 +29,16 @@ def validate_mount(config, root=MOUNT_ROOT, require_tools=True, create=False):
         raise ValueError("Montagem não aceita links simbólicos.")
     if mount.exists() and not mount.is_dir():
         raise ValueError("O ponto de montagem não é uma pasta.")
-    if mount.exists() and not os.path.ismount(mount) and any(mount.iterdir()):
-        raise ValueError("A pasta de montagem precisa estar vazia.")
+    if mount.exists() and not os.path.ismount(mount):
+        if mount.stat().st_uid != os.getuid():
+            raise ValueError("A pasta online pertence a outro usuário. Corrija a propriedade somente dessa pasta.")
+        if not os.access(mount, os.W_OK | os.X_OK):
+            raise ValueError("Sem permissão de escrita na pasta de montagem; confira as permissões da pasta online.")
+        if any(mount.iterdir()):
+            raise ValueError("A pasta de montagem precisa estar vazia; não será sobrescrita.")
     if require_tools:
         if not shutil.which("rclone"):
-            raise RuntimeError("rclone não instalado.")
+            raise RuntimeError("rclone não encontrado no PATH do serviço. Verifique /usr/bin/rclone ou /usr/local/bin/rclone.")
         if not shutil.which("fusermount3") and not shutil.which("fusermount"):
             raise RuntimeError("Instale o pacote fuse3 e habilite /dev/fuse.")
         if not Path("/dev/fuse").exists():
@@ -65,13 +70,25 @@ def main():
     if not args.serve and not args.check:
         parser.error("Use --serve ou --check")
     try:
-        cmd = command(load_settings(), require_tools=True, create=args.serve)
+        settings = load_settings()
+        cmd = command(settings, require_tools=True, create=args.serve)
+        # Local config inspection; no Google API request or token output.
+        if args.serve:
+            from rclone_backend import list_remotes
+            if settings.get("account") not in list_remotes():
+                raise ValueError(
+                    "Conta ausente no rclone deste serviço. Confira o remoto selecionado "
+                    "e a localização do rclone.conf; nenhum arquivo foi modificado.")
     except (ValueError, RuntimeError, OSError) as exc:
         parser.exit(1, "Drive para Linux: " + str(exc) + "\n")
     if args.check:
         print("Montagem disponível:", cmd[2])
         return 0
-    os.execvp(cmd[0], cmd)
+    executable = shutil.which("rclone")
+    if not executable:
+        parser.exit(1, "Drive para Linux: rclone indisponível no PATH do serviço.\n")
+    cmd[0] = executable
+    os.execv(executable, cmd)
     return 1
 
 if __name__ == "__main__":
