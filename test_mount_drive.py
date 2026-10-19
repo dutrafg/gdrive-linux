@@ -46,6 +46,27 @@ class MountTests(unittest.TestCase):
                                 "folder": str(Path(tmp)/"mirror")},
                                root=root, require_tools=False)
 
+    def test_mount_root_symlink_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            root = base / "DriveOnline"
+            target = base / "real"
+            target.mkdir()
+            root.symlink_to(target, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "simbólico"):
+                mount_path("personal", root)
+
+    def test_preflight_detects_inaccessible_fuse_device(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "DriveOnline"
+            with (patch("mount_drive.shutil.which", return_value="/usr/bin/rclone"),
+                  patch("mount_drive.Path.exists", return_value=True),
+                  patch("mount_drive.os.access", return_value=False)):
+                with self.assertRaisesRegex(RuntimeError, "não consegue acessar"):
+                    validate_mount({"account": "personal",
+                                    "folder": str(Path(tmp) / "mirror")},
+                                   root=root, require_tools=True)
+
     def test_rejects_remote_path_escape(self):
         with self.assertRaises(ValueError):
             mount_path("../escape")
