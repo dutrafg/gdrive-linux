@@ -13,8 +13,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate Python syntax
         run: |
-          python3 -m py_compile gdrive-linux rclone_backend.py settings.py progress.py google_oauth.py sync_plan.py safe_sync.py background_sync.py mount_drive.py photos_export.py desktop_files.py deletion_review.py ui_kit.py
-          python3 -m unittest -v test_backend test_settings test_progress test_google_oauth test_sync_plan test_safe_sync test_background_sync test_mount_drive test_photos_export test_desktop_files test_deletion_review
+          python3 -m py_compile gdrive-linux rclone_backend.py settings.py progress.py google_oauth.py sync_plan.py safe_sync.py background_sync.py mount_drive.py photos_export.py desktop_files.py deletion_review.py diagnostics.py ui_kit.py
+          python3 -m unittest -v test_backend test_settings test_progress test_google_oauth test_sync_plan test_safe_sync test_background_sync test_mount_drive test_photos_export test_desktop_files test_deletion_review test_diagnostics
       - name: Install GTK4 Wayland test dependencies
         run: |
           sudo apt-get update
@@ -98,6 +98,7 @@ jobs:
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/photos_export.py
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/desktop_files.py
           test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/deletion_review.py
+          test -f /tmp/gdrive-deb-check/usr/share/gdrive-linux/diagnostics.py
           test -f /tmp/gdrive-deb-check/usr/lib/systemd/user/gdrive-linux-mount.service
           test -f /tmp/gdrive-deb-check/usr/lib/systemd/user/gdrive-linux-sync.timer
           test -f /tmp/gdrive-deb-check/usr/lib/systemd/user/gdrive-linux-sync.service
