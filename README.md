@@ -45,3 +45,11 @@ O workflow `.github/workflows/build-deb.yml` executa compilação sintática Pyt
 ## Versionamento
 
 Até **0.10.0**, versões Alpha. **1.0.0 Beta** será o marco de início da fase Beta, sujeito a QA; depois seguem versões incrementais. Consulte [SECURITY.md](SECURITY.md) para cuidados de autenticação, permissões e divulgação de vulnerabilidades.
+
+## Zorin OS — dependência rclone indisponível
+
+Algumas instalações do Zorin OS não têm o pacote `rclone` disponível nas fontes APT configuradas. A partir da revisão do pacote **0.10.0 Alpha**, `rclone` é uma dependência **recomendada**, não obrigatória: o instalador gráfico poderá instalar a interface sem o rclone, mas **transferências e autenticação não funcionarão** até o rclone ser instalado separadamente.
+
+Verifique com `apt-cache policy rclone`. Se não houver candidato, confira as fontes de software da sua versão do Zorin OS e as instruções oficiais em https://rclone.org/install/ . Evite scripts de terceiros e não altere repositórios do sistema sem saber a versão-base do Ubuntu. Após instalar, execute `rclone version` para confirmar.
+
+A instalação do pacote em CI ocorre no Ubuntu, **não é um teste real no Zorin OS**. O problema específico deve ser revalidado em um computador com Zorin.
