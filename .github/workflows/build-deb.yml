@@ -15,7 +15,7 @@ jobs:
       - name: Install GTK4 smoke-test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 xvfb rclone
+          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 xvfb xauth dbus-x11 rclone
       - name: GTK4 startup smoke test
         run: |
           set +e
