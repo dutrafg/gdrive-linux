@@ -30,6 +30,13 @@ jobs:
             echo "GTK4 smoke test detected an error"
             exit 1
           fi
+      - name: Upload GTK4 diagnostic log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gtk4-smoke-diagnostics
+          path: /tmp/gdrive-smoke.log
+          if-no-files-found: ignore
       - name: Package
         run: |
           mkdir -p pkg/DEBIAN pkg/usr/bin pkg/usr/share/gdrive-linux pkg/usr/share/applications
