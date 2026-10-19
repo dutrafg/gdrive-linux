@@ -20,7 +20,17 @@ class SyncPlanTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             (Path(root) / "a.txt").write_text("hello", encoding="utf-8")
             inventory = local_inventory(root)
-            self.assertEqual(inventory["a.txt"][0], "sha256")
+            self.assertEqual(inventory["a.txt"][0], "md5")
+
+    def test_matching_md5_not_conflict(self):
+        from sync_plan import conservative_plan
+        plan = conservative_plan({"a.txt": ("md5", "abc")}, {"a.txt": ("md5", "abc")})
+        self.assertEqual(plan.conflicts, ())
+
+    def test_unknown_hash_is_conflict(self):
+        from sync_plan import conservative_plan
+        plan = conservative_plan({"a.txt": ("md5", "abc")}, {"a.txt": ("metadata", "3", "today")})
+        self.assertEqual(plan.conflicts, ("a.txt",))
 
     def test_rejects_traversal(self):
         for name in ("../private", "/absolute", "a\\b", ""):
