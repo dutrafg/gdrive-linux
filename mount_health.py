@@ -74,7 +74,7 @@ def service_journal():
 
 def mount_diagnosis(path, state=None, journal=None):
     """Give distinct ready/startup/failed states; never claim a mount from systemd alone."""
-    mounted = Path(path).is_mount()
+    mounted = mount_ready(path)
     if mounted:
         return "Disco virtual montado. Você pode abri-lo no gerenciador de arquivos."
     state = state if state is not None else service_state()
