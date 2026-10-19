@@ -24,6 +24,7 @@ from mount_autostart import autostart_enabled, update_autostart
 from sync_filters import parse_entry, parse_rules
 from sync_profiles import MODES, validate_profiles
 from rclone_config import activate_worker_config, normalize_config_path
+from transfer_lock import profile_transfer_lock
 from filemanager_bookmarks import set_bookmark
 from google_docs_export import export_documents, export_folder
 from tray_autostart import set_indicator_autostart, indicator_enabled, indicator_available
@@ -1429,8 +1430,9 @@ class DriveWindow(Gtk.ApplicationWindow):
                 mounted_previous = mount_ready(mount_path(previous))
             except (OSError, ValueError):
                 mounted_previous = False
-        if (self.auto_enabled or self.mount_autostart_on or
-                self.mount_busy or mounted_previous) and previous and requested != previous:
+        if (self.busy or self.sync_busy or self.auto_enabled or
+                self.mount_autostart_on or self.mount_busy or
+                mounted_previous) and previous and requested != previous:
             self.restoring_accounts = True
             try:
                 names = [self.remotes.get_string(i) for i in
@@ -1439,8 +1441,8 @@ class DriveWindow(Gtk.ApplicationWindow):
                     self.dropdown.set_selected(names.index(previous))
             finally:
                 self.restoring_accounts = False
-            self.notice("Pause a sincronização, desative a montagem automática e "
-                        "desmonte o Drive antes de trocar de conta.", "warning")
+            self.notice("Conclua as transferências, pause a sincronização e desmonte "
+                        "o Drive antes de trocar de conta.", "warning")
             return
         self.persist()
         self.verify_generation += 1
@@ -1768,7 +1770,8 @@ class DriveWindow(Gtk.ApplicationWindow):
 
     def safe_sync_worker(self, remote, folder):
         try:
-            plan, completed = execute_additions(remote, folder, dry_run=False)
+            with profile_transfer_lock(remote, folder):
+                plan, completed = execute_additions(remote, folder, dry_run=False)
             message = (str(completed) + " arquivos novos transferidos; " +
                        str(len(plan.conflicts)) + " conflitos preservados.")
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
@@ -2427,7 +2430,9 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.navigate("activity")
         self.progress.pulse()
         self.progress_timer = GLib.timeout_add(250, self.pulse_progress)
-        threading.Thread(target=self.worker, args=(command, generation), daemon=True).start()
+        threading.Thread(target=self.worker,
+                         args=(command, generation, self.remotes.get_string(index),
+                               self.folder), daemon=True).start()
 
     def pulse_progress(self):
         if not self.busy:
@@ -2436,7 +2441,14 @@ class DriveWindow(Gtk.ApplicationWindow):
             self.progress.pulse()
         return True
 
-    def worker(self, command, generation):
+    def worker(self, command, generation, remote, folder):
+        try:
+            with profile_transfer_lock(remote, folder):
+                self.worker_unlocked(command, generation)
+        except (OSError, RuntimeError) as exc:
+            GLib.idle_add(self.finish, generation, str(exc))
+
+    def worker_unlocked(self, command, generation):
         result = "Falha ao iniciar transferência."
         proc = None
         quota_detected = False
