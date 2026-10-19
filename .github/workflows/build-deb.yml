@@ -69,7 +69,7 @@ jobs:
           chmod 755 pkg/usr/bin/gdrive-linux
           cat > pkg/DEBIAN/control <<'EOF'
           Package: gdrive-linux
-          Version: 0.9.1
+          Version: 0.9.2
           Section: utils
           Priority: optional
           Architecture: all
@@ -86,8 +86,8 @@ jobs:
           Categories=Network;FileTransfer;
           Terminal=false
           EOF
-          dpkg-deb --build pkg gdrive-linux_0.9.1_all.deb
+          dpkg-deb --build pkg gdrive-linux_0.9.2_all.deb
       - uses: actions/upload-artifact@v4
         with:
           name: gdrive-linux-deb
-          path: gdrive-linux_0.9.1_all.deb
+          path: gdrive-linux_0.9.2_all.deb
