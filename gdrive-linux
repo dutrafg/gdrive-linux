@@ -17,6 +17,7 @@ from safe_sync import execute_additions
 from background_sync import read_json, STATE_BASE
 from mount_drive import command as mount_command, mount_path, MOUNT_ROOT
 from mount_health import mount_diagnosis, mount_ready, service_state, service_journal
+from mount_autostart import autostart_enabled, update_autostart
 from photos_export import upload_media
 from desktop_files import find_openable_file
 from deletion_review import load_candidates, archive_deletion
@@ -35,6 +36,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.busy = False
         self.sync_busy = False
         self.mount_busy = False
+        self.mount_autostart_busy = False
+        self.restoring_mount_autostart = False
         self.photos_busy = False
         self.verify_generation = 0
         self.cancel_requested = False
@@ -73,6 +76,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.archive_switch.set_active(self.auto_archive_deletions)
         self.restoring_auto = False
         self.update_background_status()
+        self.refresh_mount_startup()
         self.refresh()
         if self.auto_enabled:
             # Reconcile the persisted opt-in with the actual Linux timer on startup.
@@ -497,6 +501,18 @@ class DriveWindow(Gtk.ApplicationWindow):
         intro.append(self.mount_info)
         self.mount_status = label("Disco virtual não iniciado.", "drive-muted", wrap=True)
         intro.append(self.mount_status)
+        startup_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        startup_row.append(label("Montar Drive automaticamente ao entrar no Linux",
+                                 "drive-muted", hexpand=True, wrap=True))
+        self.mount_startup_switch = Gtk.Switch()
+        self.mount_startup_switch.set_valign(Gtk.Align.CENTER)
+        self.mount_startup_switch.set_sensitive(False)
+        self.mount_startup_switch.connect("notify::active", self.mount_startup_changed)
+        startup_row.append(self.mount_startup_switch)
+        intro.append(startup_row)
+        self.mount_startup_status = label(
+            "Consultando inicialização automática do Linux…", "drive-muted", wrap=True)
+        intro.append(self.mount_startup_status)
         readonly = Gtk.CheckButton(label="Permitir modificar arquivos pelo disco virtual (experimental)")
         self.mount_write_check = readonly
         readonly.set_active(not self.mount_read_only)
@@ -682,6 +698,73 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.notice(message, "success" if success else "error")
         if success:
             self.preview_sync()
+        return False
+
+    def refresh_mount_startup(self):
+        self.mount_startup_switch.set_sensitive(False)
+        self.mount_startup_status.set_text("Consultando ativação no systemd do usuário…")
+        threading.Thread(target=self.mount_startup_check_worker, daemon=True).start()
+
+    def mount_startup_check_worker(self):
+        active = autostart_enabled()
+        GLib.idle_add(self.mount_startup_update, active)
+
+    def mount_startup_update(self, active):
+        if self.mount_autostart_busy:
+            return False
+        self.restoring_mount_autostart = True
+        self.mount_startup_switch.set_active(active)
+        self.restoring_mount_autostart = False
+        self.mount_startup_switch.set_sensitive(True)
+        self.mount_startup_status.set_text(
+            "Ativo: o disco virtual será montado ao entrar na sessão Linux. "
+            "Se a rede estiver indisponível, o serviço tentará novamente."
+            if active else
+            "Desativado: o disco virtual será montado apenas quando solicitado.")
+        return False
+
+    def mount_startup_changed(self, switch, *_):
+        if self.restoring_mount_autostart or self.mount_autostart_busy:
+            return
+        wanted = switch.get_active()
+        if wanted:
+            remote = self.selected_remote()
+            if not remote:
+                self.notice("Selecione uma conta em Contas primeiro.", "warning")
+                self.restoring_mount_autostart = True
+                switch.set_active(False)
+                self.restoring_mount_autostart = False
+                return
+            config = {"account": remote, "folder": str(self.folder),
+                      "mount_read_only": self.mount_read_only}
+            try:
+                mount_command(config, require_tools=True, create=False)
+            except (ValueError, OSError, RuntimeError) as exc:
+                self.notice(str(exc), "warning")
+                self.restoring_mount_autostart = True
+                switch.set_active(False)
+                self.restoring_mount_autostart = False
+                return
+            self.persist()
+        self.mount_autostart_busy = True
+        switch.set_sensitive(False)
+        self.mount_startup_status.set_text("Configurando inicialização automática…")
+        threading.Thread(target=self.mount_startup_change_worker,
+                         args=(wanted,), daemon=True).start()
+
+    def mount_startup_change_worker(self, wanted):
+        enabled, message = update_autostart(wanted)
+        GLib.idle_add(self.mount_startup_change_complete, enabled, message, wanted)
+
+    def mount_startup_change_complete(self, enabled, message, wanted):
+        self.mount_autostart_busy = False
+        self.restoring_mount_autostart = True
+        self.mount_startup_switch.set_active(enabled)
+        self.restoring_mount_autostart = False
+        self.mount_startup_switch.set_sensitive(True)
+        self.mount_startup_status.set_text(message)
+        self.notice(message, "success" if enabled == wanted else "warning")
+        self.refresh_mount_status()
         return False
 
     def mount_write_toggled(self, checkbox):
