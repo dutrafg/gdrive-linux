@@ -58,6 +58,11 @@ def build_plan(local, cloud, baseline):
         elif old is not None:
             # Prior presence means a deletion or unavailable file; never resurrect blindly.
             conflicts.append(path)
+        elif path in cloud and remote_md5 is None:
+            # Google-native Docs and some provider files do not have a
+            # comparable MD5. Repeated copyto fails or exports ambiguous
+            # formats; leave these for the explicit Documents export flow.
+            conflicts.append(path)
         elif path in local:
             actions.append(("upload_new", path))
         else:
