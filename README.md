@@ -1,6 +1,6 @@
 # Drive para Linux
 
-Cliente experimental **GTK4** para acessar o Google Drive no Linux usando **rclone**. Versão atual: **0.9.2 Alpha**. Não é um cliente oficial do Google.
+Cliente experimental **GTK4** para acessar o Google Drive no Linux usando **rclone**. Versão atual: **0.9.3 Alpha**. Não é um cliente oficial do Google.
 
 ## Funcionalidades
 
@@ -22,7 +22,7 @@ sudo apt install python3 python3-gi gir1.2-gtk-4.0 rclone
 python3 gdrive-linux
 ```
 
-Para instalar o pacote `.deb`, baixe o artefato da execução aprovada em [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions) e instale com `sudo apt install ./gdrive-linux_0.9.2_all.deb`. O arquivo só estará disponível após o workflow gerar o artefato.
+Para instalar o pacote `.deb`, baixe o artefato da execução aprovada em [GitHub Actions](https://github.com/dutrafg/gdrive-linux/actions) e instale com `sudo apt install ./gdrive-linux_0.9.3_all.deb`. O arquivo só estará disponível após o workflow gerar o artefato.
 
 ## Configuração da conta
 
@@ -36,8 +36,8 @@ Escolha uma pasta local existente em **Contas**. Antes de transferir arquivos im
 
 ## Testes e empacotamento
 
-O workflow `.github/workflows/build-deb.yml` executa compilação sintática Python, testes unitários, um teste de inicialização GTK4 em Wayland nativo usando Weston headless e cria o pacote Debian. **A existência do workflow não significa que todas as execuções passaram.** Consulte [Actions](https://github.com/dutrafg/gdrive-linux/actions) para o estado atual. GTK4 usa Wayland nativamente quando a sessão Linux oferece esse protocolo; o aplicativo não força X11 e mantém compatibilidade com ambientes X11. O teste de inicialização não substitui testes visuais em GNOME/KDE ou operações reais com uma conta Google.
+O workflow `.github/workflows/build-deb.yml` executa compilação sintática Python, testes unitários, testes de transferência real entre diretórios locais usando rclone (sem OAuth), um teste de inicialização GTK4 em Wayland nativo usando Weston headless e cria o pacote Debian. **A existência do workflow não significa que todas as execuções passaram.** Consulte [Actions](https://github.com/dutrafg/gdrive-linux/actions) para o estado atual. GTK4 usa Wayland nativamente quando a sessão Linux oferece esse protocolo; o aplicativo não força X11 e mantém compatibilidade com ambientes X11. O teste de inicialização não substitui testes visuais em GNOME/KDE ou operações reais com uma conta Google.
 
 ## Versionamento
 
-Até **0.9.2**, versões Alpha. **1.0.0 Beta** será o marco de início da fase Beta, sujeito a QA; depois seguem versões incrementais. Consulte [SECURITY.md](SECURITY.md) para cuidados de autenticação, permissões e divulgação de vulnerabilidades.
+Até **0.9.3**, versões Alpha. **1.0.0 Beta** será o marco de início da fase Beta, sujeito a QA; depois seguem versões incrementais. Consulte [SECURITY.md](SECURITY.md) para cuidados de autenticação, permissões e divulgação de vulnerabilidades.
