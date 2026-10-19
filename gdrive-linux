@@ -11,7 +11,7 @@ from rclone_backend import list_remotes, copy_command, list_files
 from settings import load_settings, save_settings
 from progress import parse_progress
 
-VERSION = "0.9.5"
+VERSION = "0.9.6"
 
 class DriveWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -287,7 +287,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         if not self.auto_enabled or generation != self.auto_generation:
             return False
         if not self.busy and self.selected_remote() and self.folder.is_dir():
-            self.transfer(None, "download")
+            self.transfer(None, "download", automatic=True)
         return True
 
     def configure(self, *_):
@@ -339,7 +339,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         buf.insert(buf.get_end_iter(), line + "\n")
         return False
 
-    def transfer(self, _button, direction):
+    def transfer(self, _button, direction, automatic=False):
         if self.busy:
             return
         index = self.dropdown.get_selected()
@@ -349,6 +349,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         local = str(self.folder)
         try:
             command = copy_command(self.remotes.get_string(index), local, direction)
+            if automatic:
+                command.append("--update")
         except ValueError as exc:
             self.status.set_text(str(exc))
             return
@@ -356,7 +358,7 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.transfer_generation += 1
         generation = self.transfer_generation
         direction_name = "Download" if direction == "download" else "Upload"
-        self.current_history = Gtk.Label(label=direction_name + " • Em andamento")
+        self.current_history = Gtk.Label(label=direction_name + (" automático" if automatic else "") + " • Em andamento")
         self.current_history.set_xalign(0)
         self.history.prepend(self.current_history)
         self.proc = None
@@ -368,7 +370,8 @@ class DriveWindow(Gtk.ApplicationWindow):
         self.progress.set_fraction(0)
         self.progress_known = False
         self.progress.set_text("Transferindo…")
-        self.pages.set_visible_child_name("activity")
+        if not automatic:
+            self.pages.set_visible_child_name("activity")
         self.progress.pulse()
         self.progress_timer = GLib.timeout_add(250, self.pulse_progress)
         threading.Thread(target=self.worker, args=(command, generation), daemon=True).start()
