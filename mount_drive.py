@@ -31,6 +31,17 @@ def validate_mount(config, root=MOUNT_ROOT, require_tools=True, create=False):
         mirror = Path(mirror_value).expanduser().resolve()
         if (mount == mirror or mount in mirror.parents or mirror in mount.parents):
             raise ValueError("O disco virtual deve usar pasta separada da sincronização local.")
+    if not mount.exists():
+        # Preflight must detect an unwritable parent *before* systemd creates
+        # the missing mount directory. Never chmod/chown arbitrary user paths.
+        parent = mount.parent
+        while not parent.exists() and parent != parent.parent:
+            if parent.is_symlink():
+                raise ValueError("A pasta online não pode ter pais simbólicos.")
+            parent = parent.parent
+        if not parent.is_dir() or not os.access(parent, os.W_OK | os.X_OK):
+            raise ValueError("Sem permissão para criar a pasta do disco virtual. "
+                             "Confira as permissões de ~/DriveOnline.")
     if mount.is_symlink():
         raise ValueError("Montagem não aceita links simbólicos.")
     if mount.exists() and not mount.is_dir():
