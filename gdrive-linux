@@ -17,7 +17,7 @@ from safe_sync import execute_additions
 from background_sync import read_json, STATE_BASE
 from mount_drive import command as mount_command, mount_path, MOUNT_ROOT
 from mount_health import mount_diagnosis, mount_ready, service_state, service_journal
-from mount_checks import inspect_mount, format_mount_report
+from mount_checks import inspect_mount, format_mount_report, test_google_read_access
 from mount_autostart import autostart_enabled, update_autostart
 from sync_filters import parse_entry, parse_rules
 from sync_profiles import MODES, validate_profiles
@@ -649,6 +649,9 @@ class DriveWindow(Gtk.ApplicationWindow):
         diagnosis.append(action("Diagnosticar requisitos de montagem",
                                 self.check_mount_preflight,
                                 "system-search-symbolic", primary=True))
+        diagnosis.append(action("Testar acesso Google (consulta sem alterações)",
+                                self.check_google_mount_access,
+                                "network-transmit-receive-symbolic"))
         self.mount_preflight_text = label(
             "Clique para verificar por que o disco ainda não está montado.",
             "drive-muted", wrap=True)
@@ -987,6 +990,27 @@ class DriveWindow(Gtk.ApplicationWindow):
             message = ("Diagnóstico local indisponível. Confirme rclone, "
                        "FUSE e systemd --user no Zorin.")
         GLib.idle_add(self.mount_preflight_text.set_text, message)
+        return False
+
+    def check_google_mount_access(self, *_):
+        remote = self.selected_remote()
+        if not remote:
+            self.notice("Selecione uma conta Google antes de testar.", "warning")
+            return
+        self.mount_preflight_text.set_text(
+            "Verificando acesso à conta Google. Esta operação faz uma consulta e "
+            "pode ser bloqueada se a cota 403 estiver esgotada…")
+        threading.Thread(target=self.mount_google_worker,
+                         args=(remote,), daemon=True).start()
+
+    def mount_google_worker(self, remote):
+        allowed, summary = test_google_read_access(remote)
+        GLib.idle_add(self.mount_google_result, allowed, summary)
+        return False
+
+    def mount_google_result(self, allowed, message):
+        self.mount_preflight_text.set_text(message)
+        self.notice(message, "success" if allowed else "warning")
         return False
 
     def mount_write_toggled(self, checkbox):
