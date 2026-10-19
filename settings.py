@@ -11,14 +11,30 @@ def load_settings():
         data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             return {}
-        return {key: data[key] for key in ("folder", "account") if isinstance(data.get(key), str)}
+        result = {key: data[key] for key in ("folder", "account")
+                  if isinstance(data.get(key), str)}
+        names = data.get("account_names")
+        if isinstance(names, dict):
+            result["account_names"] = {
+                key: value for key, value in names.items()
+                if isinstance(key, str) and isinstance(value, str)
+                and len(key) <= 60 and len(value) <= 120
+            }
+        return result
     except (OSError, ValueError, TypeError):
         return {}
 
-def save_settings(folder, account=""):
+def save_settings(folder, account="", account_names=None):
     CONFIG_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(CONFIG_DIR, 0o700)
-    payload = json.dumps({"folder": str(folder), "account": account}, ensure_ascii=False)
+    payload_data = {"folder": str(folder), "account": account}
+    if account_names:
+        payload_data["account_names"] = {
+            k: v for k, v in account_names.items()
+            if isinstance(k, str) and isinstance(v, str)
+            and len(k) <= 60 and len(v) <= 120
+        }
+    payload = json.dumps(payload_data, ensure_ascii=False)
     temporary = CONFIG_FILE.with_suffix(".tmp")
     fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     try:
