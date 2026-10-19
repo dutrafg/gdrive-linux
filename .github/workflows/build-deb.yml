@@ -12,6 +12,24 @@ jobs:
         run: |
           python3 -m py_compile gdrive-linux rclone_backend.py settings.py
           python3 -m unittest -v test_backend test_settings
+      - name: Install GTK4 smoke-test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 xvfb rclone
+      - name: GTK4 startup smoke test
+        run: |
+          set +e
+          timeout 12s xvfb-run -a /usr/bin/python3 gdrive-linux > /tmp/gdrive-smoke.log 2>&1
+          result=$?
+          cat /tmp/gdrive-smoke.log
+          if [ "$result" -ne 124 ]; then
+            echo "GTK4 exited unexpectedly with code $result"
+            exit 1
+          fi
+          if grep -Eq "Traceback|NameError|TypeError|AttributeError|Gtk-WARNING|Gtk-ERROR" /tmp/gdrive-smoke.log; then
+            echo "GTK4 smoke test detected an error"
+            exit 1
+          fi
       - name: Package
         run: |
           mkdir -p pkg/DEBIAN pkg/usr/bin pkg/usr/share/gdrive-linux pkg/usr/share/applications
