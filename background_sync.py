@@ -142,7 +142,9 @@ def read_transfer_checkpoint(path):
         if not isinstance(row, dict) or row.get("operation") not in (
                 "upload_new", "download_new", "upload_update", "download_update"):
             raise ValueError("Registro de retomada contém operação inválida.")
-        validate_relative(row.get("path"))
+        if not isinstance(row.get("path"), str):
+            raise ValueError("Registro de retomada contém caminho inválido.")
+        validate_relative(row["path"])
     return info
 
 
