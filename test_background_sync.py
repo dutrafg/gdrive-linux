@@ -204,6 +204,101 @@ class SafePlanTests(unittest.TestCase):
                              "disabled")
             remotes.assert_not_called()
 
+class DurableCheckpointTests(unittest.TestCase):
+    """Borrowed from the resilient cloud queue concept, not the clinical app."""
+
+    def test_checkpoint_is_private_and_refuses_symlinks_or_corruption(self):
+        from background_sync import read_transfer_checkpoint
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "state" / "job-inflight.json"
+            expected = {"version": 1, "planned": 2,
+                        "completed": [{"operation": "upload_new", "path": "safe.txt"}]}
+            save_private_json(path, expected)
+            self.assertEqual(read_transfer_checkpoint(path), expected)
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            path.unlink()
+            path.symlink_to("/etc/passwd")
+            with self.assertRaisesRegex(ValueError, "inseguro"):
+                read_transfer_checkpoint(path)
+            path.unlink()
+            path.write_text('{"version":1,"planned":2,"completed":[{"operation":"upload_new","path":null}]}')
+            with self.assertRaisesRegex(ValueError, "caminho inválido"):
+                read_transfer_checkpoint(path)
+
+    @patch("background_sync.subprocess.run")
+    def test_new_upload_immutable_reports_cloud_collision(self, runner):
+        with tempfile.TemporaryDirectory() as root:
+            folder = Path(root)
+            (folder / "created.txt").write_text("local data")
+            runner.return_value.returncode = 0
+            runner.return_value.stderr = ""
+            transfer_one("demo", folder, "upload_new", "created.txt", "run",
+                         backup_base=folder / "history")
+            command = runner.call_args.args[0]
+            self.assertIn("--immutable", command)
+            self.assertNotIn("--ignore-existing", command)
+            self.assertNotIn("--backup-dir", command)
+
+    @patch("background_sync.list_remotes", return_value=["qa_cloud"])
+    @patch("background_sync.transfer_one")
+    @patch("background_sync.inventories")
+    def test_interrupted_batch_is_checkpointed_then_safely_replanned(
+            self, inventory, transfer, remotes):
+        from background_sync import job_key
+        with tempfile.TemporaryDirectory() as root:
+            local = Path(root) / "local"
+            local.mkdir()
+            state = Path(root) / "state"
+            backups = Path(root) / "backups"
+            local_set = {"a.txt": MD5_A, "b.txt": MD5_B}
+            inventory.side_effect = [
+                (local_set, {}),  # plan both uploads
+                RuntimeError("cloud disconnected during verification"),
+                (local_set, {"a.txt": MD5_A}),  # on restart recheck
+                (local_set, local_set),  # final verification
+            ]
+            transfer.side_effect = [
+                None, RuntimeError("network failed after one copy"), None
+            ]
+            config = {"auto_sync_enabled": True, "account": "qa_cloud",
+                      "folder": str(local)}
+            with self.assertRaisesRegex(RuntimeError, "network failed"):
+                run_once(config=config, state_base=state, backup_base=backups)
+            checkpoint = state / (job_key("qa_cloud", local) + "-inflight.json")
+            self.assertTrue(checkpoint.is_file())
+            self.assertEqual(checkpoint.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(read_json(checkpoint)["planned"], 2)
+            self.assertEqual(read_json(checkpoint)["completed"],
+                             [{"operation": "upload_new", "path": "a.txt"}])
+            result = run_once(config=config, state_base=state, backup_base=backups)
+            self.assertEqual(result["copied"], 1)
+            self.assertEqual(result["pending"], 0)
+            self.assertFalse(checkpoint.exists())
+            self.assertEqual([call.args[3] for call in transfer.call_args_list],
+                             ["a.txt", "b.txt", "b.txt"])
+
+    @patch("background_sync.run_once", side_effect=RuntimeError("Drive offline"))
+    def test_error_status_shows_unverified_transfers_without_trusting_them(
+            self, run):
+        from background_sync import job_key, run_profiles
+        with tempfile.TemporaryDirectory() as root:
+            local = Path(root) / "local"
+            local.mkdir()
+            state = Path(root) / "state"
+            checkpoint = state / (job_key("qa_cloud", local) + "-inflight.json")
+            save_private_json(checkpoint, {
+                "version": 1, "planned": 4,
+                "completed": [{"operation": "upload_new", "path": "a.txt"}],
+            })
+            result = run_profiles(
+                config={"auto_sync_enabled": True, "account": "qa_cloud",
+                        "folder": str(local)},
+                state_base=state, backup_base=Path(root) / "backups")
+            self.assertEqual(result["state"], "error")
+            self.assertEqual(result["pending"], 3)
+            self.assertEqual(result["profiles"][0]["unverified_transfers"], 1)
+            self.assertEqual(result["profiles"][0]["copied"], 0)
+
 @unittest.skipUnless(shutil.which("rclone"), "requires local rclone")
 class RcloneMirrorIntegrationTests(unittest.TestCase):
     def setUp(self):
