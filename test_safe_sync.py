@@ -11,8 +11,8 @@ class SafeSyncTests(unittest.TestCase):
             (Path(root) / "new.txt").write_text("data")
             cmd = copyto_command("drive", root, "new.txt", "upload")
             self.assertEqual(cmd[1], "copyto")
-            self.assertIn("--immutable", cmd)
-            self.assertNotIn("--ignore-existing", cmd)
+            self.assertIn("--ignore-existing", cmd)
+            self.assertNotIn("--immutable", cmd)
             self.assertNotIn("sync", cmd)
 
     def test_download_never_overwrites_existing_file(self):
