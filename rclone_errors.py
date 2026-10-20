@@ -30,6 +30,20 @@ def friendly(message):
     if "couldn't find root directory" in lower:
         return ("Não foi possível consultar a raiz do Google Drive. "
                 "Confirme as credenciais OAuth próprias e a cota da API.")
+    if "no space left on device" in lower or "disk full" in lower:
+        return "O armazenamento local está cheio. Libere espaço e tente novamente."
+    if ("mudou durante" in lower or "arquivo alterado" in lower
+            or "link simbólico" in lower or "links rígidos" in lower):
+        return ("Um arquivo ou caminho local mudou ou não é seguro. "
+                "A transferência foi suspensa; verifique a pasta.")
+    if ("network is unreachable" in lower or "connection refused" in lower
+            or "connection reset" in lower or "timeout" in lower
+            or "timed out" in lower or "drive offline" in lower):
+        return "Conexão indisponível ou tempo limite excedido. Os arquivos permanecem para retentativa."
+    if "não está montado" in lower or "transport endpoint" in lower:
+        return "O disco externo ou FUSE não está montado. Reconecte antes de tentar novamente."
+    if "histórico de sincronização" in lower:
+        return "Histórico de sincronização inválido. Recupere o estado anterior antes de prosseguir."
     return "Erro de acesso ao Drive. Consulte o diagnóstico da conta."
 
 def quota_retry_after(now=None):

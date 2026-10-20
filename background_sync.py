@@ -527,7 +527,7 @@ def run_profiles(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
             completed_count = len(progress.get("completed", []))
             pending_count = max(0, progress.get("planned", 0) - completed_count)
             status = {"state": "quota" if quota else "error",
-                      "message": friendly(raw) if quota else str(exc)[:300],
+                      "message": friendly(raw),
                       "copied": 0, "conflicts": 0, "pending": pending_count,
                       "unverified_transfers": completed_count,
                       "account": profile["account"], "folder": profile["folder"],
@@ -573,7 +573,7 @@ def main():
         raw = str(exc) + " " + str(getattr(exc, "stderr", "") or "")
         quota = is_rate_limit(raw)
         status = {"state": "quota" if quota else "error",
-                  "message": friendly(raw) if quota else str(exc)[:400],
+                  "message": friendly(raw),
                   "time": datetime.now(timezone.utc).isoformat()}
         if quota:
             status["retry_after"] = quota_retry_after()

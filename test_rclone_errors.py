@@ -12,6 +12,23 @@ class RcloneErrorTests(unittest.TestCase):
         self.assertFalse(is_rate_limit("file not found"))
         self.assertIn("sem permissão", friendly("Permission denied").lower())
 
+    def test_error_messages_are_safe_and_actionable(self):
+        variants = (
+            ("network is unreachable token=PRIVATE", "Conexão indisponível"),
+            ("No space left on device /home/user/private", "armazenamento local"),
+            ("arquivo mudou durante token=SENSITIVE", "foi suspensa"),
+            ("Histórico de sincronização /secret", "Histórico de sincronização"),
+            ("invalid_grant refresh_token=SECRET", "Reconecte"),
+        )
+        for raw, expected in variants:
+            with self.subTest(raw=raw):
+                safe = friendly(raw)
+                self.assertIn(expected, safe)
+                self.assertNotIn("PRIVATE", safe)
+                self.assertNotIn("SENSITIVE", safe)
+                self.assertNotIn("SECRET", safe)
+                self.assertNotIn("/home/user/private", safe)
+
     def test_cooldown_time(self):
         now = datetime(2026, 10, 19, 19, 0, tzinfo=timezone.utc)
         later = quota_retry_after(now)

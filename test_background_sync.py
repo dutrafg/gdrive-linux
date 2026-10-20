@@ -382,6 +382,25 @@ class DurableCheckpointTests(unittest.TestCase):
             self.assertEqual([call.args[3] for call in transfer.call_args_list],
                              ["a.txt", "b.txt", "b.txt"])
 
+    @patch("background_sync.run_once",
+           side_effect=RuntimeError("network is unreachable token=VERY_PRIVATE"))
+    def test_error_status_never_persists_raw_credentials(self, runner):
+        from background_sync import run_profiles, job_key
+        with tempfile.TemporaryDirectory() as root:
+            local = Path(root) / "selected"
+            local.mkdir()
+            state = Path(root) / "state"
+            result = run_profiles(
+                config={"auto_sync_enabled": True, "account": "qa_cloud",
+                        "folder": str(local)},
+                state_base=state, backup_base=Path(root) / "backups")
+            serialized = (state / "latest.json").read_text(encoding="utf-8")
+            details = result["profiles"][0]["message"]
+            self.assertIn("Conexão indisponível", details)
+            self.assertNotIn("VERY_PRIVATE", serialized)
+            self.assertNotIn("token=", serialized)
+            self.assertNotIn("VERY_PRIVATE", result["profiles"][0]["message"])
+
     @patch("background_sync.run_once", side_effect=RuntimeError("Drive offline"))
     def test_error_status_shows_unverified_transfers_without_trusting_them(
             self, run):
