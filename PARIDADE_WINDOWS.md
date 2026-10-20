@@ -51,7 +51,7 @@ disponíveis para Linux. Não alegar equivalência 1:1 de produto.
 
 A montagem FUSE permite criar, editar e excluir arquivos **apenas após o usuário ativar gravação e remontar o disco virtual**. O espelhamento local segue editável como pasta normal do Linux; conciliação de exclusões exige opt-in com arquivamento recuperável. Não é um substituto exato para a lixeira e para a presença colaborativa do Google Drive para Windows. A API do Google pode bloquear gravações quando a cota OAuth compartilhada está esgotada.
 
-## Recursos inspirados no Insync (v0.14.0 Alpha)
+## Recursos de sincronização Linux (v0.14.0 Alpha)
 
 | Função | Estado |
 |---|---|
@@ -64,6 +64,6 @@ A montagem FUSE permite criar, editar e excluir arquivos **apenas após o usuár
 | Navegação integrada Zorin Files | FUSE + adicionar/remover favoritos GTK |
 | Exportação de Google Docs | Office/ODF/PDF para pasta separada, não reversível |
 | Pastas/unidades Google compartilhadas | Uso pelo rclone quando remoto pré-configurado; GUI avançada pendente |
-| Identidade visual idêntica ao Insync/Google | Não copiada: GUI GTK4 própria, sem código proprietário |
+| Identidade visual e integração com o desktop | Interface GTK4 própria, independente e sem código proprietário de terceiros |
 
 A implementação completa e a **homologação real** são etapas diferentes; recursos que dependem da conta Google ou de bibliotecas locais do Zorin não estão comprovados apenas por CI.
