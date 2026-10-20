@@ -106,6 +106,52 @@ class SettingsTests(unittest.TestCase):
                 self.assertEqual(restored["account"], "demo")
                 self.assertEqual(restored["folder"], "/tmp/drive")
 
+    def test_symlinked_config_folder_is_rejected_without_modifying_target(self):
+        with tempfile.TemporaryDirectory() as root:
+            base = Path(root)
+            actual = base / "real"
+            actual.mkdir()
+            fake = base / "config"
+            fake.symlink_to(actual, target_is_directory=True)
+            with patch.object(settings, "CONFIG_DIR", fake), patch.object(
+                    settings, "CONFIG_FILE", fake / "settings.json"):
+                with self.assertRaisesRegex(ValueError, "link simbólico"):
+                    settings.save_settings("/tmp/local", "drive")
+                self.assertEqual(settings.load_settings(), {})
+                self.assertFalse((actual / "settings.json").exists())
+
+    def test_symlink_config_file_is_never_loaded_or_overwritten(self):
+        with tempfile.TemporaryDirectory() as root:
+            base = Path(root)
+            directory = base / "config"
+            directory.mkdir()
+            victim = base / "victim.json"
+            victim.write_text('{"account":"do-not-open"}', encoding="utf-8")
+            (directory / "settings.json").symlink_to(victim)
+            with patch.object(settings, "CONFIG_DIR", directory), patch.object(
+                    settings, "CONFIG_FILE", directory / "settings.json"):
+                self.assertEqual(settings.load_settings(), {})
+                with self.assertRaisesRegex(ValueError, "inseguro"):
+                    settings.save_settings("/tmp/local", "drive")
+            self.assertEqual(victim.read_text(encoding="utf-8"),
+                             '{"account":"do-not-open"}')
+
+    def test_hardlinked_config_is_not_trusted_or_replaced(self):
+        with tempfile.TemporaryDirectory() as root:
+            base = Path(root)
+            directory = base / "config"
+            directory.mkdir()
+            victim = base / "victim.json"
+            victim.write_text('{"account":"sensitive"}', encoding="utf-8")
+            os.link(victim, directory / "settings.json")
+            with patch.object(settings, "CONFIG_DIR", directory), patch.object(
+                    settings, "CONFIG_FILE", directory / "settings.json"):
+                self.assertEqual(settings.load_settings(), {})
+                with self.assertRaisesRegex(ValueError, "inseguro"):
+                    settings.save_settings("/tmp/local", "drive")
+            self.assertEqual(victim.read_text(encoding="utf-8"),
+                             '{"account":"sensitive"}')
+
     def test_corrupt_settings(self):
         with tempfile.TemporaryDirectory() as temp:
             file = Path(temp) / "settings.json"
