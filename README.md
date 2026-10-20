@@ -243,3 +243,19 @@ Foi criado também um bloqueio por **conta + pasta local**, compartilhado entre 
 Durante transferência, a interface impede alterar conta, pasta local e `rclone.conf`, inclusive quando a janela de seleção já tinha sido aberta anteriormente. O teste de inicialização GTK4 verifica esse bloqueio, e os testes rclone reais cobrem novos arquivos mantendo a versão existente intacta dos dois lados.
 
 Essas mudanças não consertam sozinhas o erro de cota Google **403 RATE_LIMIT_EXCEEDED**; a API ainda precisa estar acessível e um Client ID/Secret OAuth próprio pode ser necessário.
+
+
+## Retomada segura de lotes — checkpoint local (incremento experimental)
+
+A sincronização do **Drive para Linux** mantém o inventário local/remoto e o histórico de MD5 como fontes para decidir transferências. Para aumentar a transparência em desconexões ou encerramentos inesperados, cada execução automática habilitada registra o progresso em um arquivo privado `~/.local/state/gdrive-linux/<id-do-perfil>-inflight.json`:
+
+- O plano do lote é registrado **antes** da primeira transferência.
+- Cada saída bem-sucedida do rclone é anotada imediatamente, de forma atômica e com permissões `0600`.
+- Em caso de falha ou queda, o registro permanece para diagnóstico. Os envios concluídos são marcados como **ainda não verificados**, não como arquivos definitivamente sincronizados.
+- Após reiniciar, o aplicativo **reconsulta o inventário local e o Drive**, recalcula mudanças e conflitos e só então decide o que falta transferir. O registro anterior **nunca** autoriza sobrescritas nem exclusões.
+- Quando a verificação e a atualização do histórico terminam com sucesso, o registro provisório é retirado.
+- Para arquivos **novos enviados** ao Drive pela sincronização automática, `rclone copyto --immutable` recusa a substituição silenciosa de um arquivo remoto criado por outro dispositivo entre a varredura e a transferência. Para downloads novos, a proteção de não sobrescrita local continua ativa.
+
+Os controles já existentes — consentimento para ativar sincronização automática, timer systemd, perfis independentes, travas de transferência, filtros, arquivamento e conflito — não foram alterados. Não houve importação de componentes médicos, SQLite/SQLCipher ou backups clínicos do EvoluFisico.
+
+**Limitações:** o checkpoint registra o retorno do rclone, mas não substitui a verificação posterior entre as duas cópias. Se o Drive permanecer inacessível, a situação continua pendente e não há garantia de convergência até a próxima execução bem-sucedida. Utilize a visualização de conflitos e os backups antes de tomar decisões sobre arquivos divergentes.
