@@ -108,6 +108,68 @@ class SafePlanTests(unittest.TestCase):
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
             self.assertEqual(read_json(path)["md5"]["doc.txt"], MD5_A[1])
 
+    def test_atomic_state_refuses_symlinked_parent_and_hardlink_target(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            real = root / "real"
+            real.mkdir()
+            symlink_dir = root / "state-link"
+            symlink_dir.symlink_to(real, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "link simbólico"):
+                save_private_json(symlink_dir / "data.json", {"private": True})
+            target = real / "data.json"
+            target.write_text('{"private": true}')
+            hardlink = real / "alias.json"
+            os.link(target, hardlink)
+            with self.assertRaisesRegex(ValueError, "inseguro"):
+                save_private_json(target, {"private": False})
+            self.assertEqual(json.loads(target.read_text()), {"private": True})
+
+    def test_bounded_json_reader_rejects_symlinked_and_hardlinked_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            src = base / "real.json"
+            src.write_text('{"secret": "never load via symlink"}')
+            linked = base / "pointer.json"
+            linked.symlink_to(src)
+            self.assertEqual(read_json(linked), {})
+            linked.unlink()
+            os.link(src, linked)
+            self.assertEqual(read_json(linked), {})
+
+    @patch("background_sync.list_remotes", return_value=["qa_cloud"])
+    def test_automatic_sync_rejects_symlinked_state_directory(self, remotes):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            folder = root / "local"
+            folder.mkdir()
+            valid_state = root / "actual-state"
+            valid_state.mkdir()
+            fake_state = root / "state"
+            fake_state.symlink_to(valid_state, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "simbólico"):
+                run_once(config={"auto_sync_enabled": True, "account": "qa_cloud",
+                                 "folder": str(folder)},
+                         state_base=fake_state, backup_base=root / "backups")
+
+    @patch("background_sync.list_remotes", return_value=["qa_cloud"])
+    def test_automatic_sync_rejects_hardlinked_lock(self, remotes):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            folder = root / "local"
+            folder.mkdir()
+            state = root / "state"
+            state.mkdir()
+            original = root / "shared.lock"
+            original.write_text("hold")
+            from background_sync import job_key
+            os.link(original, state / (job_key("qa_cloud", folder) + ".lock"))
+            with self.assertRaisesRegex(ValueError, "links rígidos"):
+                run_once(config={"auto_sync_enabled": True, "account": "qa_cloud",
+                                 "folder": str(folder)},
+                         state_base=state, backup_base=root / "backups")
+            self.assertEqual(original.read_text(), "hold")
+
     @patch("background_sync.subprocess.run")
     @patch("background_sync.shutil.which", return_value="/usr/bin/notify-send")
     def test_notification_only_on_new_conflict(self, which, run):
