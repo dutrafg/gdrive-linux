@@ -26,7 +26,8 @@ def copyto_command(remote, folder, relative, direction):
         source, dest = cloud, str(target)
     else:
         raise ValueError("Direção inválida")
-    return ["rclone", "copyto", source, dest, "--ignore-existing", "--retries", "2",
+    return ["rclone", "copyto", source, dest,
+            "--immutable" if direction == "upload" else "--ignore-existing", "--retries", "2",
             "--transfers", "1", "--checkers", "1"] + rclone_limits()
 
 def execute_additions(remote, folder, max_files=100, dry_run=True):
