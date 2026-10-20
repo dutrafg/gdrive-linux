@@ -74,6 +74,8 @@ def build_plan(local, cloud, baseline):
 
 def safe_local_target(root, relative):
     validate_relative(relative)
+    if Path(root).is_symlink():
+        raise ValueError("A raiz da sincronização não pode ser um link simbólico.")
     root = root.resolve()
     target = root / relative
     if not target.resolve().is_relative_to(root):
@@ -86,14 +88,33 @@ def safe_local_target(root, relative):
     return target
 
 def local_md5(path):
-    """Recheck the surviving file just before any opt-in local archiving."""
-    digest = hashlib.md5()
-    with Path(path).open("rb") as source:
+    """Hash exactly one regular inode, refusing symlinks and concurrent edits.
+
+    This is a safety recheck immediately before a transfer or archival, not
+    an atomic lock on files that other applications may still modify.
+    """
+    path = Path(path)
+    if path.is_symlink() or not hasattr(os, "O_NOFOLLOW"):
+        raise RuntimeError("Arquivo local mudou durante a sincronização; caminho inseguro.")
+    flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    try:
+        fd = os.open(path, flags)
+    except OSError as exc:
+        raise RuntimeError("Arquivo local mudou durante a sincronização ou ficou indisponível.") from exc
+    with os.fdopen(fd, "rb") as source:
+        before = os.fstat(source.fileno())
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise RuntimeError("Arquivo local mudou durante a sincronização; links não permitidos.")
+        digest = hashlib.md5()
         while True:
             data = source.read(1024 * 1024)
             if not data:
                 break
             digest.update(data)
+        after = os.fstat(source.fileno())
+        identity = lambda st: (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+        if identity(before) != identity(after):
+            raise RuntimeError("Arquivo local mudou durante a sincronização; tente novamente.")
     return digest.hexdigest()
 
 def job_key(remote, folder):
@@ -318,7 +339,10 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
     folder_value = config.get("folder")
     if not isinstance(remote, str) or not remote or not isinstance(folder_value, str):
         raise ValueError("Selecione uma conta e pasta nas configurações")
-    folder = Path(folder_value).expanduser().resolve()
+    requested_folder = Path(folder_value).expanduser()
+    if requested_folder.is_symlink():
+        raise ValueError("A pasta selecionada é um link simbólico; sincronização bloqueada.")
+    folder = requested_folder.resolve()
     home = Path.home().resolve()
     if (folder == home or folder in home.parents
             or STATE_BASE.resolve().is_relative_to(folder)

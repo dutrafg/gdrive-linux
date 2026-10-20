@@ -110,3 +110,13 @@ Ainda são necessários backup independente, verificação de gravações penden
 - Itens sem hash comparável não são transferidos silenciosamente como se fossem arquivos comuns, evitando exportações ambíguas de documentos Google.
 - Montagens FUSE recusam locais cujo diretório pai não permite criar a unidade; nenhuma alteração recursiva de permissão ou remoção de cache é feita automaticamente.
 - Status e notificações são derivados do estado local, sem publicar tokens ou registrar nomes de arquivos nos avisos.
+
+### Integridade de arquivos durante transferências (2026-10-20)
+
+O espelho local rejeita uma pasta de origem simbólica antes de resolver o caminho e
+calcula hashes somente de arquivos regulares abertos com `O_NOFOLLOW`, verificando
+identidade e metadados antes/depois da leitura. Links rígidos não são enviados.
+Essas verificações reduzem condições de corrida durante a leitura, mas **não
+substituem um bloqueio cooperativo entre diferentes editores e o rclone**.
+Desligamentos abruptos e montagens FUSE desconectadas ainda exigem homologação
+em computadores Linux reais.

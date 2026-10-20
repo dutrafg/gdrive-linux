@@ -188,6 +188,49 @@ class SafePlanTests(unittest.TestCase):
                              "folder": str(Path.home())})
         remotes.assert_not_called()
 
+    @patch("background_sync.list_remotes", return_value=["qa_cloud"])
+    def test_run_once_rejects_symlinked_sync_root_before_cloud_access(self, remotes):
+        with tempfile.TemporaryDirectory() as tmp:
+            parent = Path(tmp)
+            real = parent / "data"
+            real.mkdir()
+            link = parent / "selected"
+            link.symlink_to(real, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "link simbólico"):
+                run_once(config={"auto_sync_enabled": True, "account": "qa_cloud",
+                                 "folder": str(link)},
+                         state_base=parent / "state", backup_base=parent / "backups")
+            remotes.assert_not_called()
+
+    @patch("background_sync.subprocess.run")
+    def test_transfer_refuses_hardlinked_file_before_rclone(self, runner):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            original = folder / "original.txt"
+            original.write_text("example")
+            os.link(original, folder / "alias.txt")
+            from background_sync import local_md5
+            with self.assertRaisesRegex(RuntimeError, "links não permitidos"):
+                local_md5(original)
+            with self.assertRaisesRegex(RuntimeError, "links não permitidos"):
+                transfer_one("demo", folder, "upload_new", "original.txt", "run",
+                             expected_local_md5="a" * 32)
+            runner.assert_not_called()
+
+    @patch("background_sync.subprocess.run")
+    def test_transfer_refuses_symlink_swapped_for_local_file(self, runner):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            origin = folder / "origin.txt"
+            origin.write_text("safe")
+            (folder / "race.txt").symlink_to(origin)
+            from background_sync import local_md5
+            with self.assertRaisesRegex(RuntimeError, "caminho inseguro"):
+                local_md5(folder / "race.txt")
+            with self.assertRaises(ValueError):
+                transfer_one("demo", folder, "upload_new", "race.txt", "run")
+            runner.assert_not_called()
+
     @patch("background_sync.inventories")
     @patch("background_sync.transfer_one", side_effect=RuntimeError(
         "API do Google Drive bloqueou consultas (403)"))
