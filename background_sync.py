@@ -10,6 +10,7 @@ import json
 import re
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import uuid
@@ -99,25 +100,51 @@ def job_key(remote, folder):
     return hashlib.sha256((remote + "\0" + str(folder.resolve())).encode()).hexdigest()[:24]
 
 def save_private_json(path, value):
+    """Atomically persist private sync state, refusing symlink/hardlink targets."""
+    path = Path(path)
+    if path.parent.is_symlink():
+        raise ValueError("Pasta do histórico é link simbólico; gravação cancelada.")
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if path.parent.is_symlink() or not path.parent.is_dir():
+        raise ValueError("Pasta de sincronização insegura.")
     os.chmod(path.parent, 0o700)
+    if path.is_symlink() or (path.exists() and (
+            not path.is_file() or path.stat().st_nlink != 1)):
+        raise ValueError("Arquivo de estado inseguro; gravação recusada.")
     temp = path.with_name(path.name + "." + uuid.uuid4().hex + ".tmp")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
     try:
-        with os.fdopen(os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600),
-                       "w", encoding="utf-8") as stream:
+        with os.fdopen(os.open(temp, flags, 0o600), "w", encoding="utf-8") as stream:
             json.dump(value, stream, ensure_ascii=False, sort_keys=True)
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temp, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY |
+                               getattr(os, "O_NOFOLLOW", 0))
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
     finally:
-        if temp.exists():
-            temp.unlink()
+        temp.unlink(missing_ok=True)
+
 
 def read_json(path):
+    """Read bounded private JSON without following a substituted state file."""
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
-    except (OSError, ValueError):
+        if not hasattr(os, "O_NOFOLLOW"):
+            return {}
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
+        with os.fdopen(fd, "r", encoding="utf-8") as stream:
+            identity = os.fstat(stream.fileno())
+            if (not stat.S_ISREG(identity.st_mode) or identity.st_nlink != 1
+                    or identity.st_size > 64 * 1024 * 1024):
+                return {}
+            data = json.load(stream)
+            return data if isinstance(data, dict) else {}
+    except (OSError, ValueError, UnicodeError):
         return {}
 
 def read_transfer_checkpoint(path):
@@ -303,14 +330,30 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
     ensure_external_volume_present(folder)
     if remote not in list_remotes():
         raise ValueError("Conta rclone não disponível")
+    state_base = Path(state_base)
+    if state_base.is_symlink():
+        raise ValueError("Diretório de estado simbólico não permitido.")
     state_base.mkdir(parents=True, mode=0o700, exist_ok=True)
+    if state_base.is_symlink() or not state_base.is_dir():
+        raise ValueError("Diretório de estado inválido.")
     os.chmod(state_base, 0o700)
     key = job_key(remote, folder)
     latest_path = state_base / (key + "-latest.json")
     latest_status = read_json(latest_path)
     if cooldown_active(latest_status):
         return latest_status
-    with (state_base / (key + ".lock")).open("a+") as lock:
+    # Shared with the manual GUI transfer lock, protecting against symlink
+    # and hardlink substitution of the lockfile before flock().
+    lockpath = state_base / (key + ".lock")
+    flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0)
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise RuntimeError("Proteção de trava O_NOFOLLOW indisponível.")
+    fd = os.open(lockpath, flags | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "a+") as lock:
+        lock_stat = os.fstat(lock.fileno())
+        if not stat.S_ISREG(lock_stat.st_mode) or lock_stat.st_nlink != 1:
+            raise ValueError("Arquivo de trava simbólico ou com links rígidos.")
+        os.fchmod(lock.fileno(), 0o600)
         try:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
