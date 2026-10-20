@@ -422,7 +422,7 @@ class DriveWindow(Gtk.ApplicationWindow):
                                    "go-next-symbolic", primary=True))
         manual.append(sync_actions)
         sync_page.append(self.make_columns(automatic, manual))
-        filters = card("Selecionar e ignorar arquivos (estilo Insync)",
+        filters = card("Selecionar e ignorar arquivos",
                        "Opcional. As regras valem para novos ciclos automáticos. "
                        "Arquivos desmarcados não são apagados da nuvem nem do computador.",
                        "view-filter-symbolic")
