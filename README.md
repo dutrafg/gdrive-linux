@@ -254,7 +254,7 @@ A sincronização do **Drive para Linux** mantém o inventário local/remoto e o
 - Em caso de falha ou queda, o registro permanece para diagnóstico. Os envios concluídos são marcados como **ainda não verificados**, não como arquivos definitivamente sincronizados.
 - Após reiniciar, o aplicativo **reconsulta o inventário local e o Drive**, recalcula mudanças e conflitos e só então decide o que falta transferir. O registro anterior **nunca** autoriza sobrescritas nem exclusões.
 - Quando a verificação e a atualização do histórico terminam com sucesso, o registro provisório é retirado.
-- Para arquivos **novos enviados** ao Drive pela sincronização automática, `rclone copyto --immutable` recusa a substituição silenciosa de um arquivo remoto criado por outro dispositivo entre a varredura e a transferência. Para downloads novos, a proteção de não sobrescrita local continua ativa.
+- Para arquivos **novos enviados** ou baixados, `rclone copyto --ignore-existing` impede sobrescritas inclusive no rclone antigo do Ubuntu 22.04. Após cada lote, um novo inventário compara os hashes MD5 dos dois lados: um arquivo criado no Drive durante a transferência será sinalizado como **conflito**, não como cópia concluída. A proteção `--immutable` foi retirada após o QA encontrar uma versão antiga do rclone que não a aplicava corretamente nesse cenário.
 
 Os controles já existentes — consentimento para ativar sincronização automática, timer systemd, perfis independentes, travas de transferência, filtros, arquivamento e conflito — não foram alterados. Não houve importação de componentes médicos, SQLite/SQLCipher ou backups clínicos do EvoluFisico.
 
