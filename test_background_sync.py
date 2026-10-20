@@ -344,6 +344,18 @@ class RcloneMirrorIntegrationTests(unittest.TestCase):
         self.assertEqual((self.cloud / "created-while-closed.txt").read_text(),
                          "offline creation")
 
+    def test_immutable_new_upload_refuses_concurrent_remote_collision(self):
+        """A changed remote destination is not silently skipped or replaced."""
+        (self.folder / "shared.txt").write_text("local unsent version", encoding="utf-8")
+        (self.cloud / "shared.txt").write_text("remote created concurrently", encoding="utf-8")
+        with self.assertRaises(RuntimeError):
+            transfer_one("qa_cloud", self.folder, "upload_new", "shared.txt",
+                         "test-race", backup_base=self.backups)
+        self.assertEqual((self.cloud / "shared.txt").read_text(encoding="utf-8"),
+                         "remote created concurrently")
+        self.assertEqual((self.folder / "shared.txt").read_text(encoding="utf-8"),
+                         "local unsent version")
+
     def test_selected_folder_receives_and_uploads_new_files(self):
         (self.folder / "saved-locally.txt").write_text("from computer", encoding="utf-8")
         (self.cloud / "created-remotely.txt").write_text("from cloud", encoding="utf-8")
