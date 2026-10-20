@@ -14,7 +14,7 @@ jobs:
       - name: Validate Python syntax
         run: |
           python3 -m py_compile gdrive-linux rclone_backend.py settings.py progress.py google_oauth.py sync_plan.py safe_sync.py background_sync.py backup_recovery.py rclone_config.py transfer_lock.py sync_display.py mount_drive.py mount_health.py mount_checks.py photos_export.py desktop_files.py deletion_review.py diagnostics.py rclone_errors.py mount_autostart.py sync_filters.py sync_profiles.py filemanager_bookmarks.py google_docs_export.py tray_indicator.py tray_autostart.py ui_kit.py
-          python3 -m unittest -v test_backend test_settings test_progress test_google_oauth test_sync_plan test_safe_sync test_background_sync test_mount_drive test_mount_health test_mount_checks test_photos_export test_desktop_files test_deletion_review test_diagnostics test_rclone_errors test_sync_profiles test_desktop_integrations test_sync_service_exit test_sync_display test_backup_recovery test_rclone_config test_transfer_lock test_transfer_lock
+          python3 -m unittest -v test_backend test_settings test_progress test_google_oauth test_sync_plan test_safe_sync test_background_sync test_mount_drive test_mount_health test_mount_checks test_photos_export test_desktop_files test_deletion_review test_diagnostics test_rclone_errors test_sync_profiles test_desktop_integrations test_sync_service_exit test_sync_display test_backup_recovery test_rclone_config test_transfer_lock test_project_identity
       - name: Install GTK4 Wayland test dependencies
         run: |
           sudo apt-get update
