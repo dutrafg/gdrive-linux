@@ -51,6 +51,9 @@ def profile_lines(state, max_profiles=4):
             summary += " (" + mode + ")"
         if copied or pending:
             summary += " — " + str(copied) + " transferido(s), " + str(pending) + " pendente(s)"
+        unverified = nonnegative_count(item.get("unverified_transfers"))
+        if unverified and item.get("state") in ("error", "quota", "partial"):
+            summary += " — " + str(unverified) + " transferência(s) aguardando confirmação"
         lines.append(summary)
     if len(profiles) > max_profiles:
         lines.append("… e mais " + str(len(profiles) - max_profiles) + " conta(s).")
