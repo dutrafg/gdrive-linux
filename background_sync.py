@@ -120,6 +120,32 @@ def read_json(path):
     except (OSError, ValueError):
         return {}
 
+def read_transfer_checkpoint(path):
+    """Read informational in-flight progress; NEVER use it to authorize overwrites.
+
+    Each new cycle re-inventories local and cloud; this only explains what
+    rclone reported successful before a crash or a disconnected Drive.
+    """
+    path = Path(path)
+    if not path.exists() and not path.is_symlink():
+        return {}
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("Registro de retomada inseguro; link simbólico recusado.")
+    info = read_json(path)
+    count = info.get("planned")
+    completed = info.get("completed")
+    if (info.get("version") != 1 or type(count) is not int
+            or not 0 <= count <= MAX_FILES * 100
+            or not isinstance(completed, list) or len(completed) > count):
+        raise ValueError("Registro de retomada danificado; os arquivos não serão alterados com base nele.")
+    for row in completed:
+        if not isinstance(row, dict) or row.get("operation") not in (
+                "upload_new", "download_new", "upload_update", "download_update"):
+            raise ValueError("Registro de retomada contém operação inválida.")
+        validate_relative(row.get("path"))
+    return info
+
+
 def read_baseline(path):
     """Fail closed on an existing damaged history; never resurrect deleted files.
 
@@ -173,7 +199,10 @@ def transfer_one(remote, folder, operation, relative, run_id, backup_base=BACKUP
     command = ["rclone", "copyto", src, dst, "--retries", "2",
                "--transfers", "1", "--checkers", "1"] + rclone_limits()
     if operation.endswith("new"):
-        command.append("--ignore-existing")
+        # Unlike --ignore-existing, --immutable reports a concurrent remote
+        # collision instead of silently claiming a newly uploaded file is safe.
+        # Local downloads remain non-overwriting.
+        command.append("--immutable" if uploading else "--ignore-existing")
     else:
         if uploading:
             backup = remote_path(remote, ".gdrive-linux-history/" + run_id)
@@ -309,6 +338,16 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
         archived = []
         run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
         original_error = None
+        checkpoint_path = state_base / (key + "-inflight.json")
+        completed_operations = []
+        checkpoint = {
+            "version": 1, "planned": planned_count,
+            "completed": completed_operations,
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        }
+        # Write-ahead progress is advisory, not a replacement for checking
+        # destination MD5s and refreshing the last-known-good baseline.
+        save_private_json(checkpoint_path, checkpoint)
         try:
             if mode == "bidirectional" and config.get("auto_archive_deletions") is True:
                 archived = archive_unilateral_deletions(remote, folder, local, cloud,
@@ -323,6 +362,8 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
                 transfer_one(remote, folder, operation, relative, run_id, backup_base,
                              expected_local_md5=expected)
                 copied += 1
+                completed_operations.append({"operation": operation, "path": relative})
+                save_private_json(checkpoint_path, checkpoint)
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
             original_error = exc
         try:
@@ -336,6 +377,9 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
                 raise
         if original_error is not None:
             raise original_error
+        # Only clear the advisory journal AFTER both inventories and baseline
+        # commit succeed; an interrupted cycle leaves evidence for diagnostics.
+        checkpoint_path.unlink(missing_ok=True)
         remaining = max(0, planned_count - copied)
         status = {"state": ("conflicts" if conflicts else
                             "partial" if remaining else "ok"),
@@ -392,9 +436,18 @@ def run_profiles(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
             raw = str(exc) + " " + str(getattr(exc, "stderr", "") or "")
             quota = is_rate_limit(raw)
+            checkpoint_path = state_base / (
+                job_key(profile["account"], Path(profile["folder"])) + "-inflight.json")
+            try:
+                progress = read_transfer_checkpoint(checkpoint_path)
+            except (OSError, ValueError):
+                progress = {}
+            completed_count = len(progress.get("completed", []))
+            pending_count = max(0, progress.get("planned", 0) - completed_count)
             status = {"state": "quota" if quota else "error",
                       "message": friendly(raw) if quota else str(exc)[:300],
-                      "copied": 0, "conflicts": 0, "pending": 0,
+                      "copied": 0, "conflicts": 0, "pending": pending_count,
+                      "unverified_transfers": completed_count,
                       "account": profile["account"], "folder": profile["folder"],
                       "time": datetime.now(timezone.utc).isoformat()}
             if quota:
