@@ -1,4 +1,4 @@
-"""Conservative Insync-inspired selective/ignore rules for bidirectional mirroring.
+"""Conservative selective/ignore rules for bidirectional mirroring.
 
 Rules are applied identically to local and remote inventories *before* computing
 actions or deletions. Excluding a path never deletes its existing copies.
