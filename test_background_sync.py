@@ -226,7 +226,7 @@ class DurableCheckpointTests(unittest.TestCase):
                 read_transfer_checkpoint(path)
 
     @patch("background_sync.subprocess.run")
-    def test_new_upload_immutable_reports_cloud_collision(self, runner):
+    def test_new_upload_preserves_existing_cloud_file(self, runner):
         with tempfile.TemporaryDirectory() as root:
             folder = Path(root)
             (folder / "created.txt").write_text("local data")
@@ -235,8 +235,8 @@ class DurableCheckpointTests(unittest.TestCase):
             transfer_one("demo", folder, "upload_new", "created.txt", "run",
                          backup_base=folder / "history")
             command = runner.call_args.args[0]
-            self.assertIn("--immutable", command)
-            self.assertNotIn("--ignore-existing", command)
+            self.assertIn("--ignore-existing", command)
+            self.assertNotIn("--immutable", command)
             self.assertNotIn("--backup-dir", command)
 
     @patch("background_sync.list_remotes", return_value=["qa_cloud"])
@@ -344,13 +344,22 @@ class RcloneMirrorIntegrationTests(unittest.TestCase):
         self.assertEqual((self.cloud / "created-while-closed.txt").read_text(),
                          "offline creation")
 
-    def test_immutable_new_upload_refuses_concurrent_remote_collision(self):
-        """A changed remote destination is not silently skipped or replaced."""
-        (self.folder / "shared.txt").write_text("local unsent version", encoding="utf-8")
-        (self.cloud / "shared.txt").write_text("remote created concurrently", encoding="utf-8")
-        with self.assertRaises(RuntimeError):
-            transfer_one("qa_cloud", self.folder, "upload_new", "shared.txt",
-                         "test-race", backup_base=self.backups)
+    def test_new_upload_race_preserves_destination_and_reports_conflict(self):
+        """Old rclone skips a raced cloud path; the verified rescan flags conflict."""
+        from background_sync import inventories
+        from unittest.mock import patch
+        (self.folder / "shared.txt").write_text(
+            "local unsent version", encoding="utf-8")
+        (self.cloud / "shared.txt").write_text(
+            "remote created concurrently", encoding="utf-8")
+        actual_local, actual_cloud = inventories("qa_cloud", self.folder)
+        # Simulate a Drive file created AFTER the first inventory.
+        with patch("background_sync.inventories", side_effect=[
+                (actual_local, {}), (actual_local, actual_cloud)]):
+            result = self.run_sync()
+        self.assertEqual(result["state"], "conflicts")
+        self.assertEqual(result["copied"], 0)
+        self.assertEqual(result["conflicts"], 1)
         self.assertEqual((self.cloud / "shared.txt").read_text(encoding="utf-8"),
                          "remote created concurrently")
         self.assertEqual((self.folder / "shared.txt").read_text(encoding="utf-8"),
