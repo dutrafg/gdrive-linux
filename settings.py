@@ -9,6 +9,12 @@ CONFIG_FILE = CONFIG_DIR / "settings.json"
 
 def load_settings():
     try:
+        if CONFIG_DIR.is_symlink() or CONFIG_FILE.is_symlink():
+            return {}
+        if CONFIG_FILE.exists() and (
+                not CONFIG_FILE.is_file() or CONFIG_FILE.stat().st_nlink != 1
+                or CONFIG_FILE.stat().st_size > 8 * 1024 * 1024):
+            return {}
         data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             return {}
@@ -43,8 +49,15 @@ def save_settings(folder, account="", account_names=None, auto_sync_enabled=Fals
                   sync_includes=None, sync_excludes=None,
                   sync_mode="bidirectional", sync_profiles=None,
                   profiles_configured=False, rclone_config_file=""):
+    if CONFIG_DIR.is_symlink():
+        raise ValueError("Diretório de configurações inseguro: link simbólico.")
     CONFIG_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if CONFIG_DIR.is_symlink() or not CONFIG_DIR.is_dir():
+        raise ValueError("Diretório de configurações inválido.")
     os.chmod(CONFIG_DIR, 0o700)
+    if CONFIG_FILE.is_symlink() or (CONFIG_FILE.exists() and
+            (not CONFIG_FILE.is_file() or CONFIG_FILE.stat().st_nlink != 1)):
+        raise ValueError("Arquivo de configurações inseguro; não será substituído.")
     from sync_filters import parse_rules
     includes = parse_rules(sync_includes)
     excludes = parse_rules(sync_excludes)
@@ -78,6 +91,12 @@ def save_settings(folder, account="", account_names=None, auto_sync_enabled=Fals
             os.fsync(stream.fileno())
         os.chmod(temporary, 0o600)
         os.replace(temporary, CONFIG_FILE)
+        dir_fd = os.open(CONFIG_DIR, os.O_RDONLY | os.O_DIRECTORY |
+                         getattr(os, "O_NOFOLLOW", 0))
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
