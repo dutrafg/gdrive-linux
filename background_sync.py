@@ -201,10 +201,10 @@ def transfer_one(remote, folder, operation, relative, run_id, backup_base=BACKUP
     command = ["rclone", "copyto", src, dst, "--retries", "2",
                "--transfers", "1", "--checkers", "1"] + rclone_limits()
     if operation.endswith("new"):
-        # Unlike --ignore-existing, --immutable reports a concurrent remote
-        # collision instead of silently claiming a newly uploaded file is safe.
-        # Local downloads remain non-overwriting.
-        command.append("--immutable" if uploading else "--ignore-existing")
+        # The oldest supported rclone (Ubuntu 22.04) can overwrite a destination
+        # even with --immutable on copyto. --ignore-existing is the portable
+        # no-overwrite protection. A post-copy inventory detects skipped files.
+        command.append("--ignore-existing")
     else:
         if uploading:
             backup = remote_path(remote, ".gdrive-linux-history/" + run_id)
@@ -369,9 +369,22 @@ def run_once(config=None, state_base=STATE_BASE, backup_base=BACKUP_BASE,
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
             original_error = exc
         try:
-            # Preserve independently verified completed copies, but never
-            # replace the original failure with an unrelated re-scan failure.
+            # A zero rclone exit code is NOT proof of a transferred file:
+            # --ignore-existing may have skipped a name created remotely
+            # between inventory and copy. Re-read both sides and compare MD5.
             local_after, cloud_after = inventories(remote, folder, includes, excludes)
+            verified_count = 0
+            extra_conflicts = set(conflicts)
+            for item in completed_operations:
+                relative = item["path"]
+                left = fingerprint(local_after.get(relative))
+                right = fingerprint(cloud_after.get(relative))
+                if left and left == right:
+                    verified_count += 1
+                elif relative in local_after and relative in cloud_after:
+                    extra_conflicts.add(relative)
+            conflicts = sorted(extra_conflicts)
+            copied = verified_count
             new_base = refresh_baseline(baseline, local_after, cloud_after)
             save_private_json(snapshot_path, {"md5": dict(excluded_baseline, **new_base)})
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
