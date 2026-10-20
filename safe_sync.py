@@ -26,8 +26,11 @@ def copyto_command(remote, folder, relative, direction):
         source, dest = cloud, str(target)
     else:
         raise ValueError("Direção inválida")
+    # Ubuntu 22.04's rclone copyto --immutable can overwrite different
+    # content. --ignore-existing preserves the destination on all supported
+    # versions; background_sync confirms MD5 after each batch.
     return ["rclone", "copyto", source, dest,
-            "--immutable" if direction == "upload" else "--ignore-existing", "--retries", "2",
+            "--ignore-existing", "--retries", "2",
             "--transfers", "1", "--checkers", "1"] + rclone_limits()
 
 def execute_additions(remote, folder, max_files=100, dry_run=True):
