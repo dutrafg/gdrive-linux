@@ -55,5 +55,57 @@ class TransferLockTests(unittest.TestCase):
             with profile_transfer_lock("drive", base, base / "state"):
                 self.assertEqual((base / "state").stat().st_mode & 0o777, 0o700)
 
+    def test_symlink_lock_cannot_overwrite_target(self):
+        with tempfile.TemporaryDirectory() as root:
+            base = Path(root)
+            local = base / "local"
+            local.mkdir()
+            state = base / "state"
+            state.mkdir()
+            victim = base / "important.txt"
+            victim.write_text("DO NOT MODIFY", encoding="utf-8")
+            lock = state / (job_key("drive", local) + ".lock")
+            lock.symlink_to(victim)
+            with self.assertRaisesRegex(ValueError, "inseguro"):
+                with profile_transfer_lock("drive", local, state):
+                    pass
+            self.assertEqual(victim.read_text(encoding="utf-8"), "DO NOT MODIFY")
+
+    def test_hardlink_lock_rejected(self):
+        import os
+        with tempfile.TemporaryDirectory() as root:
+            base = Path(root)
+            local = base / "local"
+            local.mkdir()
+            state = base / "state"
+            state.mkdir()
+            victim = base / "important.txt"
+            victim.write_text("KEEP", encoding="utf-8")
+            os.link(victim, state / (job_key("drive", local) + ".lock"))
+            with self.assertRaisesRegex(ValueError, "múltiplos links"):
+                with profile_transfer_lock("drive", local, state):
+                    pass
+            self.assertEqual(victim.read_text(encoding="utf-8"), "KEEP")
+
+    def test_symlinked_state_directory_rejected(self):
+        with tempfile.TemporaryDirectory() as root:
+            base = Path(root)
+            local = base / "local"
+            local.mkdir()
+            state = base / "state"
+            real = base / "real-state"
+            real.mkdir()
+            state.symlink_to(real, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "simbólico"):
+                with profile_transfer_lock("drive", local, state):
+                    pass
+
+    def test_lock_permissions_are_private(self):
+        with tempfile.TemporaryDirectory() as root:
+            base = Path(root)
+            with profile_transfer_lock("drive", base, base / "state"):
+                lock = base / "state" / (job_key("drive", base) + ".lock")
+                self.assertEqual(lock.stat().st_mode & 0o777, 0o600)
+
 if __name__ == "__main__":
     unittest.main()
