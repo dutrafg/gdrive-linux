@@ -28,6 +28,18 @@ class SyncDisplayTests(unittest.TestCase):
         self.assertNotIn("\npath", lines[0])
         self.assertEqual(nonnegative_count("invalid"), 0)
 
+    def test_interrupted_sync_reports_unverified_without_paths(self):
+        result = profile_lines({"profiles": [
+            {"account": "pessoal", "state": "error", "copied": 0,
+             "pending": 3, "unverified_transfers": 2,
+             "folder": "/secreto/fotos", "message": "token=SECRET"}
+        ]})
+        self.assertEqual(len(result), 1)
+        self.assertIn("2 transferência(s) aguardando confirmação", result[0])
+        self.assertIn("3 pendente(s)", result[0])
+        self.assertNotIn("/secreto", result[0])
+        self.assertNotIn("SECRET", result[0])
+
     def test_stale_timer_is_visible(self):
         now = datetime(2026, 10, 19, 20, 0, tzinfo=timezone.utc)
         previous = (now - timedelta(minutes=22)).isoformat()
